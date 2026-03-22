@@ -2,32 +2,40 @@ import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
 import { getDemoHomePageModel } from "@/lib/data/demo";
 import type { EthosUserSnapshot, ProjectMention, ProjectOutcome, ProjectSnapshot, TierRollup } from "@/lib/types/domain";
 
+function getEmptyHomePageModel() {
+  return {
+    projects: [] as ProjectSnapshot[],
+    users: [] as EthosUserSnapshot[],
+    outcomes: [] as ProjectOutcome[],
+    mentions: [] as ProjectMention[],
+    tierRollups: [] as TierRollup[]
+  };
+}
+
 export async function getHomePageModel() {
   if (!isDatabaseConfigured()) {
     return getDemoHomePageModel();
   }
 
   try {
-  const [projects, users, outcomes, mentions] = await Promise.all([
-    prisma.project.findMany({
+  const projects = await prisma.project.findMany({
       include: { aliases: true },
       orderBy: [{ totalVotes: "desc" }, { updatedAt: "desc" }],
       take: 16
-    }),
-    prisma.ethosUser.findMany({
+    });
+    const users = await prisma.ethosUser.findMany({
       orderBy: [{ trustComposite: "desc" }, { score: "desc" }],
       take: 8
-    }),
-    prisma.projectOutcome.findMany({
+    });
+    const outcomes = await prisma.projectOutcome.findMany({
       orderBy: { updatedAt: "desc" },
       take: 20
-    }),
-    prisma.projectMention.findMany({
+    });
+    const mentions = await prisma.projectMention.findMany({
       include: { tweet: true },
       orderBy: { mentionedAt: "desc" },
       take: 200
-    })
-  ]);
+    });
 
   const projectSnapshots: ProjectSnapshot[] = projects.map((project: any) => ({
     id: project.id,
@@ -146,7 +154,7 @@ export async function getHomePageModel() {
   };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return getDemoHomePageModel();
+      return getEmptyHomePageModel();
     }
     throw error;
   }

@@ -140,7 +140,7 @@ export async function getProjectDetail(projectId: string) {
   });
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return getDemoProjectDetail(projectId);
+      return null;
     }
     throw error;
   }
@@ -199,7 +199,11 @@ export async function getProjectFlow(projectId: string) {
   };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return getDemoProjectFlow(projectId);
+      return {
+        projectId,
+        firstByTier: {},
+        edges: []
+      };
     }
     throw error;
   }
@@ -244,7 +248,7 @@ export async function getUserDetail(userkey: string) {
   };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
-      return getDemoUserDetail(userkey);
+      return null;
     }
     throw error;
   }
