@@ -1,7 +1,13 @@
-import { prisma } from "@/lib/db";
+import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
+import { getDemoHomePageModel } from "@/lib/data/demo";
 import type { EthosUserSnapshot, ProjectMention, ProjectOutcome, ProjectSnapshot, TierRollup } from "@/lib/types/domain";
 
 export async function getHomePageModel() {
+  if (!isDatabaseConfigured()) {
+    return getDemoHomePageModel();
+  }
+
+  try {
   const [projects, users, outcomes, mentions] = await Promise.all([
     prisma.project.findMany({
       include: { aliases: true },
@@ -138,4 +144,10 @@ export async function getHomePageModel() {
     mentions: normalizedMentions,
     tierRollups: [...tierRollupMap.values()]
   };
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return getDemoHomePageModel();
+    }
+    throw error;
+  }
 }

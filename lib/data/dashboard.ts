@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/db";
+import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
+import { getDemoProjectDetail, getDemoProjectFlow, getDemoUserDetail } from "@/lib/data/demo";
 import type { TrustTier } from "@/lib/types/domain";
 
 function parseWindowDays(input: string | null) {
@@ -15,6 +16,15 @@ export async function listProjectDashboardData(params: {
   windowDays?: string | null;
   sort?: string | null;
 }) {
+  if (!isDatabaseConfigured()) {
+    return {
+      windowDays: parseWindowDays(params.windowDays ?? null),
+      total: 0,
+      projects: []
+    };
+  }
+
+  try {
   const windowDays = parseWindowDays(params.windowDays ?? null);
   const fromDate = fromDateForWindow(windowDays);
 
@@ -92,9 +102,24 @@ export async function listProjectDashboardData(params: {
     total: sorted.length,
     projects: sorted
   };
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return {
+        windowDays: parseWindowDays(params.windowDays ?? null),
+        total: 0,
+        projects: []
+      };
+    }
+    throw error;
+  }
 }
 
 export async function getProjectDetail(projectId: string) {
+  if (!isDatabaseConfigured()) {
+    return getDemoProjectDetail(projectId);
+  }
+
+  try {
   return prisma.project.findUnique({
     where: { id: projectId },
     include: {
@@ -113,9 +138,20 @@ export async function getProjectDetail(projectId: string) {
       }
     }
   });
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return getDemoProjectDetail(projectId);
+    }
+    throw error;
+  }
 }
 
 export async function getProjectFlow(projectId: string) {
+  if (!isDatabaseConfigured()) {
+    return getDemoProjectFlow(projectId);
+  }
+
+  try {
   const mentions = await prisma.projectMention.findMany({
     where: { projectId },
     orderBy: { mentionedAt: "asc" }
@@ -161,9 +197,20 @@ export async function getProjectFlow(projectId: string) {
     firstByTier: Object.fromEntries([...firstByTier.entries()].map(([tier, date]) => [tier, date.toISOString()])),
     edges
   };
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return getDemoProjectFlow(projectId);
+    }
+    throw error;
+  }
 }
 
 export async function getUserDetail(userkey: string) {
+  if (!isDatabaseConfigured()) {
+    return getDemoUserDetail(userkey);
+  }
+
+  try {
   const user = await prisma.ethosUser.findUnique({
     where: { userkey }
   });
@@ -195,4 +242,10 @@ export async function getUserDetail(userkey: string) {
       weight: mention.weight
     }))
   };
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return getDemoUserDetail(userkey);
+    }
+    throw error;
+  }
 }

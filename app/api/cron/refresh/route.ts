@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { prisma } from "@/lib/db";
+import { isDatabaseConfigured, prisma } from "@/lib/db";
 import { syncProjectCatalog } from "@/lib/data/projects";
 import { priceClient } from "@/lib/providers/price";
 
@@ -27,6 +27,10 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ error: "DATABASE_URL is not configured" }, { status: 503 });
   }
 
   const syncedProjects = await syncProjectCatalog();
