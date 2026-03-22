@@ -50,7 +50,7 @@ export default async function Page() {
           <div className="hero-content">
             <div className="hero-nav">
               <div className="hero-brand-row">
-                <div className="hero-brand">ETHOSKAITO</div>
+                <div className="hero-brand">ETHOSALPHA</div>
                 <nav className="hero-nav-links" aria-label="Primary">
                   <a href="#mindshare-board">Mindshare</a>
                   <a href="#signal-grid">Signal Grid</a>

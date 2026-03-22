@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ethos Alpha Dashboard",
+  title: "ETHOSALPHA",
   description: "Tiered project intelligence built from Ethos reputation and X signal flow."
 };
 
