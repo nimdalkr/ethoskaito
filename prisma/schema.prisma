@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TrackedAccount {
+  id           String   @id @default(cuid())
+  xUsername    String   @unique
+  ethosUserkey String?
+  source       String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model EthosUser {
+  id                        String   @id @default(cuid())
+  userkey                   String   @unique
+  profileId                 Int?     @unique
+  username                  String?
+  displayName               String
+  avatarUrl                 String
+  description               String?
+  score                     Float
+  level                     String
+  influenceFactor           Float
+  influenceFactorPercentile Float
+  humanVerificationStatus   String?
+  validatorNftCount         Int      @default(0)
+  xpTotal                   Float    @default(0)
+  xpStreakDays              Int      @default(0)
+  reviewPositive            Int      @default(0)
+  reviewNeutral             Int      @default(0)
+  reviewNegative            Int      @default(0)
+  vouchGivenCount           Int      @default(0)
+  vouchReceivedCount        Int      @default(0)
+  trustComposite            Float
+  trustTier                 String
+  raw                       Json
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  tweets                    Tweet[]
+}
+
+model Tweet {
+  id             String        @id @default(cuid())
+  tweetId        String        @unique
+  url            String
+  xUsername      String
+  authorName     String
+  text           String
+  createdAt      DateTime
+  observedAt     DateTime
+  source         String
+  likeCount      Int           @default(0)
+  repostCount    Int           @default(0)
+  replyCount     Int           @default(0)
+  quoteCount     Int           @default(0)
+  raw            Json
+  ethosUserId    String?
+  ethosUser      EthosUser?    @relation(fields: [ethosUserId], references: [id])
+  mentions       ProjectMention[]
+  insertedAt     DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([xUsername, createdAt])
+}
+
+model Project {
+  id            String          @id @default(cuid())
+  projectId     Int             @unique
+  userkey       String
+  name          String
+  username      String?
+  description   String?
+  totalVotes    Int             @default(0)
+  uniqueVoters  Int             @default(0)
+  bullishVotes  Int             @default(0)
+  bearishVotes  Int             @default(0)
+  commentCount  Int             @default(0)
+  categories    Json
+  chains        Json
+  raw           Json
+  aliases       ProjectAlias[]
+  mentions      ProjectMention[]
+  marketMappings ProjectMarketMapping[]
+  outcomes      ProjectOutcome[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model ProjectAlias {
+  id        String   @id @default(cuid())
+  projectId String
+  alias     String
+  normalizedAlias String
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, normalizedAlias])
+  @@index([normalizedAlias])
+}
+
+model ProjectMention {
+  id                    String   @id @default(cuid())
+  tweetId               String
+  projectId             String
+  authorUserkey         String
+  authorTier            String
+  authorComposite       Float
+  weight                Int
+  isFirstTrackedMention Boolean  @default(false)
+  mentionedAt           DateTime
+  createdAt             DateTime @default(now())
+  tweet                 Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  project               Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([tweetId, projectId])
+  @@index([projectId, mentionedAt])
+}
+
+model ProjectOutcome {
+  id            String   @id @default(cuid())
+  projectId     String
+  source        String
+  symbol        String
+  firstPriceAt  DateTime?
+  latestPriceAt DateTime?
+  return1d      Float?
+  return7d      Float?
+  return30d     Float?
+  raw           Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, source, symbol])
+}
+
+model ProjectMarketMapping {
+  id        String   @id @default(cuid())
+  projectId String
+  source    String
+  symbol    String
+  baseCurrency String @default("usd")
+  isPrimary Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, source, symbol, baseCurrency])
+}
