@@ -1,17 +1,14 @@
 import { prisma } from "@/lib/db";
 import { matchProjectsByText } from "@/lib/analytics/project-match";
 import { getTierWeight } from "@/lib/analytics/tier";
-import { syncProjectCatalog } from "@/lib/data/projects";
+import { ensureProjectCatalog } from "@/lib/data/projects";
 import { buildEthosUserSnapshot, buildTrackedAccountWriteData, upsertEthosUser } from "@/lib/data/users";
 import type { IngestBatchInput } from "@/lib/types/api";
 import { ethosClient } from "@/lib/providers/ethos";
 import { fxTwitterClient } from "@/lib/providers/fxtwitter";
 
 async function ensureAliasesLoaded() {
-  const projectCount = await prisma.project.count();
-  if (projectCount === 0) {
-    await syncProjectCatalog();
-  }
+  await ensureProjectCatalog();
 
   return prisma.project.findMany({
     include: {

@@ -10,7 +10,23 @@ export function ProjectDetailPanel({
   outcomes: ProjectOutcome[];
   mentions: ProjectMention[];
 }) {
-  const project = projects[0];
+  const project =
+    projects
+      .slice()
+      .sort((left, right) => {
+        const leftWeight = mentions
+          .filter((mention) => mention.projectId === left.id)
+          .reduce((sum, mention) => sum + mention.weight, 0);
+        const rightWeight = mentions
+          .filter((mention) => mention.projectId === right.id)
+          .reduce((sum, mention) => sum + mention.weight, 0);
+
+        if (rightWeight !== leftWeight) {
+          return rightWeight - leftWeight;
+        }
+
+        return right.totalVotes - left.totalVotes;
+      })[0] ?? null;
   const outcome = outcomes.find((item) => item.projectId === project?.id);
   const firstMention = mentions.find((item) => item.projectId === project?.id && item.isFirstTrackedMention);
 

@@ -1,5 +1,6 @@
 import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
 import { getDemoHomePageModel } from "@/lib/data/demo";
+import { ensureProjectCatalog } from "@/lib/data/projects";
 import type { CollectorOpsSummary, EthosUserSnapshot, ProjectMention, ProjectOutcome, ProjectSnapshot, TierRollup } from "@/lib/types/domain";
 
 function getEmptyHomePageModel() {
@@ -31,10 +32,11 @@ export async function getHomePageModel() {
   }
 
   try {
+    await ensureProjectCatalog();
+
     const projects = await prisma.project.findMany({
       include: { aliases: true },
-      orderBy: [{ totalVotes: "desc" }, { updatedAt: "desc" }],
-      take: 16
+      orderBy: [{ updatedAt: "desc" }]
     });
     const users = await prisma.ethosUser.findMany({
       orderBy: [{ trustComposite: "desc" }, { score: "desc" }],
@@ -47,7 +49,7 @@ export async function getHomePageModel() {
     const mentions = await prisma.projectMention.findMany({
       include: { tweet: true },
       orderBy: { mentionedAt: "desc" },
-      take: 200
+      take: 1500
     });
     const totalUsers = await prisma.ethosUser.count();
     const totalTrackedAccounts = await prisma.trackedAccount.count({
@@ -114,7 +116,28 @@ export async function getHomePageModel() {
       }
     });
 
-  const projectSnapshots: ProjectSnapshot[] = projects.map((project: any) => ({
+  const mentionWeightByProject = new Map<string, number>();
+  for (const mention of mentions) {
+    mentionWeightByProject.set(mention.projectId, (mentionWeightByProject.get(mention.projectId) ?? 0) + mention.weight);
+  }
+
+  const projectSnapshots: ProjectSnapshot[] = projects
+    .slice()
+    .sort((left: any, right: any) => {
+      const leftWeight = mentionWeightByProject.get(left.id) ?? 0;
+      const rightWeight = mentionWeightByProject.get(right.id) ?? 0;
+      if (rightWeight !== leftWeight) {
+        return rightWeight - leftWeight;
+      }
+
+      if (right.totalVotes !== left.totalVotes) {
+        return right.totalVotes - left.totalVotes;
+      }
+
+      return right.updatedAt.getTime() - left.updatedAt.getTime();
+    })
+    .slice(0, 64)
+    .map((project: any) => ({
     id: project.id,
     projectId: project.projectId,
     userkey: project.userkey,

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { normalizeToken } from "@/lib/utils";
 import { ethosClient } from "@/lib/providers/ethos";
+import { ensureKaitoProjectSeed, syncKaitoProjectSeed } from "@/lib/data/kaito-projects";
 
 function buildProjectAliases(project: any) {
   const candidates = new Set<string>();
@@ -102,12 +103,15 @@ export async function syncProjectCatalog() {
     }
   }
 
+  await syncKaitoProjectSeed();
+
   return prisma.project.count();
 }
 
 export async function ensureProjectCatalog() {
   const count = await prisma.project.count();
   if (count > 0) {
+    await ensureKaitoProjectSeed();
     return count;
   }
 
