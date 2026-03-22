@@ -9,7 +9,6 @@ import { ProjectHeatmap } from "@/components/project/project-heatmap";
 import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
 import { UserSummaryList } from "@/components/user/user-summary-list";
 import { getTrustTierLabel } from "@/lib/analytics/tier";
-import { getCollectorModeLabel } from "@/lib/collector/scheduling";
 import { getHomePageModel } from "@/lib/data/home";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +115,11 @@ export default async function Page() {
           <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
           <MetricCard label="Signal authors" value={model.totalUsers} delta="Ethos profiles synced" />
           <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh live signals captured" />
-          <MetricCard label="24h collector coverage" value={`${collector.coveragePct}%`} delta={`${collector.coveredLast24h} of ${collector.totalTrackedAccounts} accounts`} />
+          <MetricCard
+            label="24h collector coverage"
+            value={`${collector.coveragePct}%`}
+            delta={`${collector.coveredLast24h} of ${collector.totalTrackedAccounts} accounts`}
+          />
         </div>
       </section>
 
@@ -141,7 +144,8 @@ export default async function Page() {
               <div className="panel-line">
                 <span>Top tier weight share</span>
                 <strong>
-                  {getTrustTierLabel("T4")} {totalWeightedMentions > 0 ? `${Math.round((topTierWeight / totalWeightedMentions) * 100)}%` : "0%"}
+                  {getTrustTierLabel("T4")}{" "}
+                  {totalWeightedMentions > 0 ? `${Math.round((topTierWeight / totalWeightedMentions) * 100)}%` : "0%"}
                 </strong>
               </div>
               <div className="panel-line">
@@ -172,47 +176,8 @@ export default async function Page() {
         </Card>
       </section>
 
-      <section id="project-lab" className="dual-grid dual-grid-ratio-alt">
+      <section id="project-lab" className="stack-4">
         <ProjectDetailPanel projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
-        <Card variant="surface">
-          <CardHeader>
-            <CardTitle>Collector operations</CardTitle>
-          </CardHeader>
-          <CardContent className="stack-3">
-            <div className="panel-line">
-              <span>24h covered accounts</span>
-              <strong>
-                {collector.coveredLast24h} / {collector.totalTrackedAccounts}
-              </strong>
-            </div>
-            <div className="panel-line">
-              <span>Due right now</span>
-              <strong>{collector.dueNow}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Accounts with failures</span>
-              <strong>{collector.failedAccounts}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Last main sweep</span>
-              <strong>{collector.latestMainCompletedAt ? new Date(collector.latestMainCompletedAt).toLocaleString() : "Not completed yet"}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Last repair sweep</span>
-              <strong>{collector.latestRepairCompletedAt ? new Date(collector.latestRepairCompletedAt).toLocaleString() : "Not completed yet"}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Last hot sweep</span>
-              <strong>{collector.latestHotCompletedAt ? new Date(collector.latestHotCompletedAt).toLocaleString() : "Not completed yet"}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Most recent run</span>
-              <strong>
-                {collector.latestRun ? `${getCollectorModeLabel(collector.latestRun.mode as any)} · ${collector.latestRun.status}` : "No collector run yet"}
-              </strong>
-            </div>
-          </CardContent>
-        </Card>
       </section>
 
       <section id="first-movers" className="dual-grid dual-grid-even">
