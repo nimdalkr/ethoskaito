@@ -37,24 +37,24 @@ function normalizeMode(value: string | null): CollectorMode {
 function getDefaultBatchConfig(mode: CollectorMode) {
   if (mode === "repair") {
     return {
-      accountLimit: 300,
+      accountLimit: 400,
       tweetsPerAccount: 2,
-      concurrency: 5
+      concurrency: 8
     };
   }
 
   if (mode === "hot") {
     return {
-      accountLimit: 250,
-      tweetsPerAccount: 4,
-      concurrency: 5
+      accountLimit: 300,
+      tweetsPerAccount: 3,
+      concurrency: 10
     };
   }
 
   return {
-    accountLimit: 500,
-    tweetsPerAccount: 2,
-    concurrency: 5
+    accountLimit: 700,
+    tweetsPerAccount: 1,
+    concurrency: 10
   };
 }
 

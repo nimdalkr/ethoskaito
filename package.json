@@ -12,7 +12,8 @@
     "postinstall": "prisma generate",
     "collector:main": "node scripts/collector-worker.mjs main",
     "collector:repair": "node scripts/collector-worker.mjs repair",
-    "collector:hot": "node scripts/collector-worker.mjs hot"
+    "collector:hot": "node scripts/collector-worker.mjs hot",
+    "collector:supervisor": "node scripts/collector-supervisor.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",

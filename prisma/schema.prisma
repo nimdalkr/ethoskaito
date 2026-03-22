@@ -19,6 +19,7 @@ model TrackedAccount {
   lastCollectedAt       DateTime?
   lastSweepAt           DateTime?
   lastSuccessfulSweepAt DateTime?
+  lastSeenTweetId       String?
   lastObservedTweetAt   DateTime?
   lastDiscoveredCount   Int       @default(0)
   lastQueuedCount       Int       @default(0)

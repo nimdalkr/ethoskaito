@@ -6,6 +6,7 @@ import {
   getNextEligibleAt,
   getPriorityScore
 } from "@/lib/collector/scheduling";
+import { getUnseenTweetRefs } from "@/lib/collector/fresh-tweets";
 import { buildTrackedAccountWriteData } from "@/lib/data/users";
 import { ingestTweetBatch } from "@/lib/ingest/ingest-batch";
 import { xGuestClient } from "@/lib/providers/x-guest";
@@ -175,6 +176,7 @@ async function getCollectionCandidates(input: {
       nextEligibleAt: true,
       lastCollectedAt: true,
       lastSuccessfulSweepAt: true,
+      lastSeenTweetId: true,
       lastObservedTweetAt: true,
       lastQueuedCount: true,
       priorityScore: true,
@@ -202,6 +204,7 @@ async function collectSingleAccount(input: {
   tweetsPerAccount: number;
   mode: CollectorMode;
   session: unknown;
+  lastSeenTweetId?: string | null;
 }) {
   const collectedAt = new Date();
 
@@ -213,11 +216,12 @@ async function collectSingleAccount(input: {
       },
       input.session as any
     );
+    const unseenRecentTweets = getUnseenTweetRefs(recentTweets, input.lastSeenTweetId);
 
     const existingTweets = await prisma.tweet.findMany({
       where: {
         tweetId: {
-          in: recentTweets.map((tweet) => tweet.tweetId)
+          in: unseenRecentTweets.map((tweet) => tweet.tweetId)
         }
       },
       select: {
@@ -225,7 +229,7 @@ async function collectSingleAccount(input: {
       }
     });
     const existingTweetIds = new Set(existingTweets.map((tweet) => tweet.tweetId));
-    const freshTweets = recentTweets.filter((tweet) => !existingTweetIds.has(tweet.tweetId));
+    const freshTweets = unseenRecentTweets.filter((tweet) => !existingTweetIds.has(tweet.tweetId));
 
     let processed = 0;
     if (freshTweets.length > 0) {
@@ -257,6 +261,7 @@ async function collectSingleAccount(input: {
         lastCollectedAt: collectedAt,
         lastSweepAt: collectedAt,
         lastSuccessfulSweepAt: collectedAt,
+        lastSeenTweetId: recentTweets[0]?.tweetId ?? input.lastSeenTweetId ?? null,
         lastObservedTweetAt: latestObservedAt,
         lastDiscoveredCount: recentTweets.length,
         lastQueuedCount: freshTweets.length,
@@ -359,9 +364,9 @@ export async function collectTrackedTweets(options: {
 } = {}) {
   const totalTrackedAccounts = await ensureTrackedAccountsFromProjects();
   const mode = options.mode ?? "main";
-  const accountLimit = Math.max(1, Math.min(options.accountLimit ?? 20, 1000));
+  const accountLimit = Math.max(1, Math.min(options.accountLimit ?? 20, 2000));
   const tweetsPerAccount = Math.max(1, Math.min(options.tweetsPerAccount ?? 5, 20));
-  const concurrency = Math.max(1, Math.min(options.concurrency ?? 5, 10));
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? 5, 20));
   const shardCount = Math.max(1, Math.min(options.shardCount ?? DEFAULT_COLLECTOR_SHARDS, 200));
 
   await backfillTrackedAccountScheduling(shardCount, options.schedulingBackfillLimit ?? 1000);
@@ -422,7 +427,8 @@ export async function collectTrackedTweets(options: {
         source: account.source,
         tweetsPerAccount,
         mode,
-        session
+        session,
+        lastSeenTweetId: account.lastSeenTweetId
       })
     )
   );

@@ -31,17 +31,17 @@ if (mode === "main") {
       mode: "main",
       shard: String(shardId),
       shards: String(shardCount),
-      accounts: process.env.COLLECTOR_ACCOUNTS ?? "900",
-      tweets: process.env.COLLECTOR_TWEETS ?? "2",
-      concurrency: process.env.COLLECTOR_CONCURRENCY ?? "5"
+      accounts: process.env.COLLECTOR_ACCOUNTS ?? "700",
+      tweets: process.env.COLLECTOR_TWEETS ?? "1",
+      concurrency: process.env.COLLECTOR_CONCURRENCY ?? "10"
     });
   }
 } else {
   await postCollect({
     mode,
     shards: String(shardCount),
-    accounts: process.env.COLLECTOR_ACCOUNTS ?? (mode === "hot" ? "250" : "500"),
-    tweets: process.env.COLLECTOR_TWEETS ?? (mode === "hot" ? "4" : "2"),
-    concurrency: process.env.COLLECTOR_CONCURRENCY ?? "5"
+    accounts: process.env.COLLECTOR_ACCOUNTS ?? (mode === "hot" ? "300" : "400"),
+    tweets: process.env.COLLECTOR_TWEETS ?? (mode === "hot" ? "3" : "2"),
+    concurrency: process.env.COLLECTOR_CONCURRENCY ?? (mode === "hot" ? "10" : "8")
   });
 }
