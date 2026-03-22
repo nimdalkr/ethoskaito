@@ -132,7 +132,7 @@ export default async function Page() {
             <Badge tone="accent">Top live projects</Badge>
           </CardHeader>
           <CardContent className="stack-3">
-            <ProjectMindshareBoard projects={model.projects} outcomes={model.outcomes} tierRollups={model.tierRollups} />
+            <ProjectMindshareBoard projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
             <div className="board-summary-grid">
               <div className="panel-line">
                 <span>First tracked mentions</span>

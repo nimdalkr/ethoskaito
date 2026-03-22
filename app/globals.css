@@ -542,6 +542,40 @@ code {
   gap: 12px;
 }
 
+.mindshare-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.mindshare-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mindshare-window-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mindshare-window-button {
+  min-width: 60px;
+  padding-inline: 14px;
+}
+
+.mindshare-window-button-active {
+  box-shadow: 0 0 0 1px rgba(242, 211, 127, 0.5);
+}
+
+.mindshare-window-meta {
+  font-size: 0.82rem;
+  color: rgba(229, 231, 235, 0.72);
+}
+
 .mindshare-board {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -614,31 +648,52 @@ code {
 }
 
 .mindshare-meta > span,
-.mindshare-body span {
+.mindshare-body span,
+.mindshare-kpis span {
   font-size: 0.86rem;
   color: rgba(255, 255, 255, 0.84);
 }
 
 .mindshare-body {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .mindshare-body strong {
   font-size: 0.92rem;
 }
 
-.mindshare-stats,
-.mindshare-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.mindshare-handle {
+  opacity: 0.82;
 }
 
-.mindshare-footer span {
+.mindshare-primary-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mindshare-primary-metric strong {
+  font-size: clamp(1.3rem, 2vw, 2.4rem);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.mindshare-primary-metric span {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.72;
+}
+
+.mindshare-kpis {
+  display: grid;
+  gap: 4px;
+}
+
+.mindshare-kpis span {
   font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .mindshare-dot {
@@ -671,6 +726,19 @@ code {
       transparent 2px 12px
     );
   clip-path: polygon(0 88%, 7% 82%, 13% 84%, 20% 70%, 28% 76%, 35% 64%, 42% 68%, 51% 52%, 58% 58%, 65% 46%, 74% 55%, 82% 34%, 90% 40%, 100% 10%, 100% 100%, 0 100%);
+}
+
+.mindshare-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 220px;
+  padding: 28px;
+  border-radius: 16px;
+  border: 1px dashed rgba(242, 211, 127, 0.28);
+  background: rgba(7, 10, 12, 0.56);
+  color: rgba(255, 255, 255, 0.82);
+  text-align: center;
 }
 
 .heatmap-grid {
