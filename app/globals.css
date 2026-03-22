@@ -17,7 +17,7 @@
   --danger-soft: rgba(168, 36, 67, 0.22);
   --shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
   --radius: 24px;
-  --max-width: 1480px;
+  --max-width: 1680px;
   color-scheme: dark;
 }
 
@@ -329,11 +329,11 @@ code {
 }
 
 .dual-grid-ratio {
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.95fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dual-grid-ratio-alt {
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 0.78fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dual-grid-even {
@@ -493,6 +493,13 @@ code {
   display: flex;
 }
 
+.card-header-split {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
 .ui-card-title {
   margin: 0;
   font-size: 1.08rem;
@@ -524,12 +531,23 @@ code {
   font-size: 0.92rem;
 }
 
+.compact-copy {
+  max-width: 920px;
+  margin: 0;
+}
+
+.board-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .mindshare-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: 132px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: 138px;
   gap: 6px;
-  min-height: 540px;
+  min-height: 620px;
 }
 
 .mindshare-tile {
@@ -603,11 +621,24 @@ code {
 
 .mindshare-body {
   display: grid;
-  gap: 4px;
+  gap: 8px;
 }
 
 .mindshare-body strong {
   font-size: 0.92rem;
+}
+
+.mindshare-stats,
+.mindshare-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mindshare-footer span {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .mindshare-dot {
@@ -643,15 +674,15 @@ code {
 }
 
 .heatmap-grid {
-  grid-template-columns: minmax(180px, 1.3fr) repeat(5, minmax(54px, 1fr));
+  grid-template-columns: minmax(240px, 1.6fr) repeat(5, minmax(96px, 1fr));
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
 }
 
 .heatmap-head,
 .heatmap-project,
 .heatmap-cell {
-  min-height: 58px;
+  min-height: 72px;
   border-radius: 16px;
   border: 1px solid var(--border);
   display: flex;
@@ -669,7 +700,7 @@ code {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  padding: 12px 14px;
+  padding: 16px 18px;
   gap: 4px;
   background: rgba(255, 255, 255, 0.03);
 }
@@ -687,7 +718,7 @@ code {
 }
 
 .heatmap-cell span {
-  font-size: 0.96rem;
+  font-size: 1.02rem;
   font-weight: 700;
 }
 
@@ -790,7 +821,8 @@ code {
   .metric-grid,
   .dual-grid,
   .hero-strip,
-  .mindshare-board {
+  .mindshare-board,
+  .board-summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -843,6 +875,11 @@ code {
   .hero-action-row .button {
     width: 100%;
     justify-content: center;
+  }
+
+  .card-header-split {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .hero-title {

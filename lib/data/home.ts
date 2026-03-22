@@ -12,7 +12,7 @@ export async function getHomePageModel() {
     prisma.project.findMany({
       include: { aliases: true },
       orderBy: [{ totalVotes: "desc" }, { updatedAt: "desc" }],
-      take: 12
+      take: 16
     }),
     prisma.ethosUser.findMany({
       orderBy: [{ trustComposite: "desc" }, { score: "desc" }],

@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { MentionFlow } from "@/components/project/mention-flow";
 import { ProjectDetailPanel } from "@/components/project/project-detail-panel";
 import { ProjectHeatmap } from "@/components/project/project-heatmap";
 import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
@@ -115,22 +114,20 @@ export default async function Page() {
         </div>
       </section>
 
-      <section id="mindshare-board" className="dual-grid dual-grid-ratio">
+      <section id="mindshare-board" className="stack-4">
         <Card variant="surface">
-          <CardHeader className="card-header-inline">
-            <CardTitle>Mindshare board</CardTitle>
+          <CardHeader className="card-header-split">
+            <div className="stack-3">
+              <CardTitle>Mindshare board</CardTitle>
+              <p className="muted-copy compact-copy">
+                Weighted attention by project, ranked by live mention share, trust-tier participation, and outcome pressure.
+              </p>
+            </div>
             <Badge tone="accent">Top live projects</Badge>
           </CardHeader>
-          <CardContent>
+          <CardContent className="stack-3">
             <ProjectMindshareBoard projects={model.projects} outcomes={model.outcomes} tierRollups={model.tierRollups} />
-          </CardContent>
-        </Card>
-        <Card variant="surface">
-          <CardHeader>
-            <CardTitle>Signal quality</CardTitle>
-          </CardHeader>
-          <CardContent className="stack-4">
-            <div className="stack-3">
+            <div className="board-summary-grid">
               <div className="panel-line">
                 <span>First tracked mentions</span>
                 <strong>{firstMentions.length}</strong>
@@ -148,29 +145,23 @@ export default async function Page() {
                 </strong>
               </div>
             </div>
-            <MentionFlow mentions={model.mentions} users={model.users} projects={model.projects} />
           </CardContent>
         </Card>
       </section>
 
-      <section id="signal-grid" className="dual-grid dual-grid-ratio-alt">
+      <section id="signal-grid" className="stack-4">
         <Card variant="surface">
-          <CardHeader className="card-header-inline">
-            <CardTitle>Tier x project heatmap</CardTitle>
+          <CardHeader className="card-header-split">
+            <div className="stack-3">
+              <CardTitle>Tier x project heatmap</CardTitle>
+              <p className="muted-copy compact-copy">
+                Full-width tier distribution across the live project set. Read across for project spread and down each column for trust-layer concentration.
+              </p>
+            </div>
             <Badge tone="neutral">Trust-weighted grid</Badge>
           </CardHeader>
           <CardContent>
             <ProjectHeatmap projects={model.projects} tierRollups={model.tierRollups} />
-          </CardContent>
-        </Card>
-        <Card variant="surface">
-          <CardHeader>
-            <CardTitle>Signal notes</CardTitle>
-          </CardHeader>
-          <CardContent className="stack-3 muted-copy">
-            <p>The board takes the treemap reading pattern from the reference image and maps it to weighted project mindshare.</p>
-            <p>Green tiles indicate stronger validation or neutral-positive posture, while red tiles surface projects that were mentioned but not yet proven.</p>
-            <p>Use the heatmap to see which trust layer accumulated attention behind each project after the initial mention.</p>
           </CardContent>
         </Card>
       </section>
