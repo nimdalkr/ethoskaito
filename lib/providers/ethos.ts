@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { env } from "@/lib/env";
 import { clamp, normalizeToken, slugify } from "@/lib/utils";
 import { fetchJson, pickString, pickNumber, isRecord, asRecord } from "@/lib/providers/shared";
 import type {
@@ -15,7 +16,13 @@ import type {
   ProviderRequestOptions
 } from "@/lib/types/provider";
 
-const defaultBaseUrl = process.env.ETHOS_API_BASE_URL ?? "https://api.ethos.network/api/v2";
+const defaultBaseUrl = env.ETHOS_API_BASE_URL;
+
+export function buildEthosHeaders(headers: HeadersInit = {}) {
+  const merged = new Headers(headers);
+  merged.set("X-Ethos-Client", env.ETHOS_CLIENT_NAME);
+  return merged;
+}
 
 const ethosScoreLevelSchema = z.enum([
   "untrusted",
@@ -443,8 +450,15 @@ export class EthosClient {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
   }
 
+  private withHeaders<T extends ProviderRequestOptions>(options: T): T {
+    return {
+      ...options,
+      headers: buildEthosHeaders(options.headers)
+    };
+  }
+
   async getUserByX(xUsername: string, options: ProviderRequestOptions = {}): Promise<EthosUserByXResult> {
-    const { data } = await fetchJson("ethos", `${this.baseUrl}/user/by/x/${encodeURIComponent(xUsername)}`, options, (value) =>
+    const { data } = await fetchJson("ethos", `${this.baseUrl}/user/by/x/${encodeURIComponent(xUsername)}`, this.withHeaders(options), (value) =>
       userSchema.parse(value)
     );
     return normalizeUser(data);
@@ -453,14 +467,14 @@ export class EthosClient {
   async getScoreLevel(userkey: string, options: ProviderRequestOptions = {}): Promise<EthosScoreLevelResult> {
     const { data } = await fetchJson(
       "ethos",
-      `${this.baseUrl}/score/userkey`,
-      {
+        `${this.baseUrl}/score/userkey`,
+      this.withHeaders({
         ...options,
         query: {
           userkey,
           triggerCalculation: true
         }
-      },
+      }),
       (value) => scoreSchema.parse(value)
     );
 
@@ -477,7 +491,7 @@ export class EthosClient {
     let offset = 0;
     let total = Number.POSITIVE_INFINITY;
     const projects: EthosProjectResult[] = [];
-    const requestOptions = { ...options };
+    const requestOptions = this.withHeaders({ ...options });
     delete (requestOptions as { limit?: number }).limit;
 
     while (projects.length < total) {
@@ -511,7 +525,7 @@ export class EthosClient {
     const limit = Math.max(1, Math.min(options.limit ?? 500, 500));
     const offset = Math.max(0, options.offset ?? 0);
     const archived = options.archived ?? false;
-    const requestOptions = { ...options };
+    const requestOptions = this.withHeaders({ ...options });
     delete (requestOptions as { limit?: number }).limit;
     delete (requestOptions as { offset?: number }).offset;
     delete (requestOptions as { archived?: boolean }).archived;
@@ -546,7 +560,7 @@ export class EthosClient {
   }
 
   async getProjectById(projectId: string | number, options: ProviderRequestOptions = {}): Promise<EthosProjectResult> {
-    const { data } = await fetchJson("ethos", `${this.baseUrl}/projects/${encodeURIComponent(String(projectId))}`, options, (value) =>
+    const { data } = await fetchJson("ethos", `${this.baseUrl}/projects/${encodeURIComponent(String(projectId))}`, this.withHeaders(options), (value) =>
       projectSchema.parse(value)
     );
     return normalizeProject(data);
@@ -556,7 +570,7 @@ export class EthosClient {
     const limit = options.limit ?? 100;
     let offset = 0;
     const vouches: EthosVouchRecord[] = [];
-    const requestOptions = { ...options };
+    const requestOptions = this.withHeaders({ ...options });
     delete (requestOptions as { limit?: number }).limit;
 
     while (true) {

@@ -19,6 +19,7 @@ Copy `.env.example` to `.env` and set:
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ethos_alpha
+ETHOS_CLIENT_NAME=ethosalpha
 INGEST_API_KEY=replace-me
 CRON_SECRET=replace-me
 ```
@@ -75,6 +76,7 @@ Provide `x-api-key: <INGEST_API_KEY>` when calling the ingest route.
 
 - The app expects an external collector to supply tweet IDs or URLs.
 - A built-in sync route can now backfill the full Ethos profile pool via `/profiles`.
+- All Ethos API requests include `X-Ethos-Client` using `ETHOS_CLIENT_NAME`.
 - The collector discovers recent tweets from tracked Ethos usernames through X guest GraphQL and then expands each tweet through FxTwitter.
 - Project catalog sync uses Ethos `projects`.
 - Price mappings are seeded from project usernames and should be reviewed for accuracy.
