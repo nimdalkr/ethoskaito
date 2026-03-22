@@ -6,3 +6,6 @@ coverage
 dist
 generated
 *.tsbuildinfo
+
+.vercel
+.env*.local

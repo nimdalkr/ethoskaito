@@ -70,8 +70,8 @@ export default async function Page() {
               </Badge>
               <h1 className="hero-title hero-title-gradient">Web3 signal at the speed of conviction.</h1>
               <p className="hero-copy hero-copy-wide">
-                Ethos reputation, FxTwitter expansion, and project-level flow analytics in one board. See which tier spotted a
-                project first, how attention spread, and whether the thesis actually held up.
+                Ethos reputation and project-level flow analytics in one board. See which tier spotted a project first,
+                how attention spread, and whether the thesis actually held up.
               </p>
               <div className="hero-action-row">
                 <Button className="hero-primary-button">Open Live Dashboard</Button>
@@ -110,7 +110,7 @@ export default async function Page() {
         <div className="metric-grid">
           <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
           <MetricCard label="Signal authors" value={model.users.length} delta="Ranked by trust composite" />
-          <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh tweets expanded by FxTwitter" />
+          <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh live signals captured" />
           <MetricCard label="Weighted mentions" value={totalWeightedMentions} delta="Tier-weighted signal volume" />
         </div>
       </section>
@@ -213,7 +213,7 @@ export default async function Page() {
             </div>
             <div className="panel-line">
               <span>Collector mode</span>
-              <strong>X guest + FxTwitter</strong>
+              <strong>Live signal tracking</strong>
             </div>
           </CardContent>
         </Card>
