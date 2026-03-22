@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { matchProjectsByText } from "@/lib/analytics/project-match";
 import { getTierWeight } from "@/lib/analytics/tier";
 import { syncProjectCatalog } from "@/lib/data/projects";
-import { buildEthosUserSnapshot, toEthosXUsernameUserkey, upsertEthosUser } from "@/lib/data/users";
+import { buildEthosUserSnapshot, upsertEthosUser } from "@/lib/data/users";
 import type { IngestBatchInput } from "@/lib/types/api";
 import { ethosClient } from "@/lib/providers/ethos";
 import { fxTwitterClient } from "@/lib/providers/fxtwitter";
@@ -41,6 +41,7 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
     projectId: project.id,
     aliases: project.aliases.map((alias: any) => alias.alias)
   }));
+  const ethosUsersByUsername = await ethosClient.getUsersByX(input.tweets.map((item) => item.xUsername));
 
   const results = [];
 
@@ -51,10 +52,8 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
       tweetUrl: item.tweetUrl
     });
 
-    const rawUser = await ethosClient.getUserByX(item.xUsername);
-    const userkey = rawUser?.userkey ?? toEthosXUsernameUserkey(rawUser?.username ?? item.xUsername);
-    const score = userkey ? await ethosClient.getScoreLevel(userkey) : null;
-    const snapshot = buildEthosUserSnapshot(rawUser, score?.level);
+    const rawUser = ethosUsersByUsername.get(item.xUsername.trim().toLowerCase()) ?? (await ethosClient.getUserByX(item.xUsername));
+    const snapshot = buildEthosUserSnapshot(rawUser, rawUser?.level ?? undefined);
     const userRecord = await upsertEthosUser(snapshot, rawUser);
 
     await prisma.trackedAccount.upsert({

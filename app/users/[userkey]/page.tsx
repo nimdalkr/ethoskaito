@@ -13,7 +13,7 @@ export default async function UserPage({ params }: { params: { userkey: string }
     notFound();
   }
 
-  const { user, mentionCount, firstMentionCount, hitRate, projects } = payload;
+  const { user, mentionCount, firstMentionCount, hitRate, projects, categories, recentActivities, xpMultipliers } = payload;
 
   return (
     <main className="app-shell">
@@ -83,6 +83,84 @@ export default async function UserPage({ params }: { params: { userkey: string }
                       <strong>{new Date(project.mentionedAt).toLocaleString()}</strong>
                     </div>
                   ))
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
+          <section>
+            <Card variant="surface">
+              <CardHeader>
+                <CardTitle>Ethos category ranks</CardTitle>
+              </CardHeader>
+              <CardContent className="stack-3">
+                {categories.length === 0 ? (
+                  <p className="muted-copy">No category ranking data available yet.</p>
+                ) : (
+                  categories.slice(0, 6).map((item: any) => (
+                    <div key={`${item.category.id}-${item.rank}`} className="panel-line">
+                      <span>{item.category.name}</span>
+                      <strong>#{item.rank}</strong>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
+          <section>
+            <Card variant="surface">
+              <CardHeader>
+                <CardTitle>Recent Ethos activity</CardTitle>
+              </CardHeader>
+              <CardContent className="stack-3">
+                {recentActivities.length === 0 ? (
+                  <p className="muted-copy">No recent Ethos activity was returned for this profile.</p>
+                ) : (
+                  recentActivities.map((activity: any, index: number) => (
+                    <div key={`${activity.type}-${activity.createdAt ?? index}`} className="stack-1">
+                      <div className="panel-line">
+                        <span>{activity.title}</span>
+                        <strong>{activity.type}</strong>
+                      </div>
+                      <span className="muted-copy">
+                        {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : "Timestamp unavailable"}
+                        {activity.score !== null ? ` · score ${activity.score}` : ""}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
+          <section>
+            <Card variant="surface">
+              <CardHeader>
+                <CardTitle>XP multipliers</CardTitle>
+              </CardHeader>
+              <CardContent className="stack-3">
+                {!xpMultipliers ? (
+                  <p className="muted-copy">XP multiplier data is not available for this user yet.</p>
+                ) : (
+                  <>
+                    <div className="panel-line">
+                      <span>Combined multiplier</span>
+                      <strong>{xpMultipliers.combinedMultiplier.toFixed(2)}x</strong>
+                    </div>
+                    <div className="panel-line">
+                      <span>Score multiplier</span>
+                      <strong>{xpMultipliers.scoreMultiplier.value.toFixed(2)}x</strong>
+                    </div>
+                    <div className="panel-line">
+                      <span>Streak multiplier</span>
+                      <strong>{xpMultipliers.streakMultiplier.value.toFixed(2)}x</strong>
+                    </div>
+                    <div className="panel-line">
+                      <span>Validator count</span>
+                      <strong>{xpMultipliers.validatorCount}</strong>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>

@@ -1,5 +1,6 @@
 import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
 import { getDemoProjectDetail, getDemoProjectFlow, getDemoUserDetail } from "@/lib/data/demo";
+import { ethosClient } from "@/lib/providers/ethos";
 import type { TrustTier } from "@/lib/types/domain";
 
 function parseWindowDays(input: string | null) {
@@ -233,12 +234,20 @@ export async function getUserDetail(userkey: string) {
 
   const firstMentions = mentions.filter((mention: any) => mention.isFirstTrackedMention);
   const hitRate = mentions.length > 0 ? firstMentions.length / mentions.length : 0;
+  const [categoriesResult, activitiesResult, xpResult] = await Promise.allSettled([
+    ethosClient.getUserCategoryRanks(user.userkey),
+    ethosClient.getProfileActivities(user.userkey, { limit: 6 }),
+    user.profileId ? ethosClient.getXpMultipliers(user.profileId) : Promise.resolve(null)
+  ]);
 
   return {
     user,
     mentionCount: mentions.length,
     firstMentionCount: firstMentions.length,
     hitRate,
+    categories: categoriesResult.status === "fulfilled" ? categoriesResult.value.categoryRanks : [],
+    recentActivities: activitiesResult.status === "fulfilled" ? activitiesResult.value.values : [],
+    xpMultipliers: xpResult.status === "fulfilled" ? xpResult.value : null,
     projects: firstMentions.map((mention: any) => ({
       projectId: mention.projectId,
       projectName: mention.project.name,

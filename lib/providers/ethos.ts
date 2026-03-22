@@ -1,9 +1,14 @@
 import { z } from "zod";
 
 import { env } from "@/lib/env";
+import { pickCanonicalEthosUserkey } from "@/lib/ethos/identity";
 import { clamp, normalizeToken, slugify } from "@/lib/utils";
-import { fetchJson, pickString, pickNumber, isRecord, asRecord } from "@/lib/providers/shared";
+import { fetchJson, pickString, pickNumber, isRecord, asRecord, pickFirstRecord } from "@/lib/providers/shared";
 import type {
+  EthosActivityFeedResult,
+  EthosActivitySummary,
+  EthosCategoryRank,
+  EthosCategoryRanksResult,
   EthosProjectCategory,
   EthosProjectChain,
   EthosProfilesPageResult,
@@ -13,6 +18,7 @@ import type {
   EthosScoreLevelResult,
   EthosUserByXResult,
   EthosVouchRecord,
+  EthosXpMultipliers,
   ProviderRequestOptions
 } from "@/lib/types/provider";
 
@@ -193,6 +199,58 @@ const vouchUserSchema = z.object({
   validatorNftCount: z.number().default(0)
 });
 
+const categoryRanksResponseSchema = z.object({
+  categoryRanks: z
+    .array(
+      z.object({
+        rank: z.number(),
+        category: z
+          .object({
+            id: z.number(),
+            slug: z.string().nullable().optional(),
+            name: z.string(),
+            description: z.string().nullable().optional(),
+            showOnLeaderboard: z.boolean().default(false),
+            showInDailyService: z.boolean().default(false),
+            bannerImageUrl: z.string().nullable().optional(),
+            userCount: z.number().default(0)
+          })
+          .passthrough()
+      })
+    )
+    .default([])
+});
+
+const activityFeedSchema = z.object({
+  values: z.array(z.unknown()).default([]),
+  total: z.number().default(0),
+  limit: z.number().default(0),
+  offset: z.number().default(0)
+});
+
+const multiplierTierSchema = z.object({
+  threshold: z.number(),
+  multiplier: z.number()
+});
+
+const xpMultipliersSchema = z.object({
+  scoreMultiplier: z.object({
+    value: z.number(),
+    score: z.number(),
+    tier: z.string(),
+    nextTier: multiplierTierSchema.nullable()
+  }),
+  streakMultiplier: z.object({
+    value: z.number(),
+    streakDays: z.number(),
+    tier: z.string(),
+    nextTier: multiplierTierSchema.nullable()
+  }),
+  validatorCount: z.number(),
+  marketHoldingsEth: z.number(),
+  combinedMultiplier: z.number()
+});
+
 function deriveEthosLevel(score: number) {
   if (score >= 2600) return "renowned";
   if (score >= 2300) return "revered";
@@ -266,7 +324,11 @@ function normalizeUser(user: z.infer<typeof userSchema>): EthosUserByXResult {
 
   return {
     userId: user.id,
-    userkey: user.userkeys[0] ?? user.username ?? user.id,
+    userkey: pickCanonicalEthosUserkey({
+      userkeys: user.userkeys,
+      username: user.username ?? null,
+      id: user.id
+    }),
     userkeys: user.userkeys,
     profileId: user.profileId ?? null,
     displayName: user.displayName,
@@ -389,7 +451,11 @@ function normalizeVouchUser(raw: unknown) {
   const trustComposite = clamp((user.score / 2800) * 60 + (user.influenceFactorPercentile / 100) * 20 + (user.humanVerificationStatus === "VERIFIED" ? 10 : 0), 0, 100);
   return {
     userId: user.id,
-    userkey: user.userkeys?.[0] ?? user.username ?? user.id,
+    userkey: pickCanonicalEthosUserkey({
+      userkeys: user.userkeys ?? [],
+      username: user.username ?? null,
+      id: user.id
+    }),
     profileId: user.profileId ?? null,
     displayName: user.displayName,
     username: user.username ?? null,
@@ -443,6 +509,67 @@ function normalizeVouchesResponse(value: unknown): EthosVouchRecord[] {
   return values.map(normalizeVouchRecord).filter((item): item is EthosVouchRecord => Boolean(item));
 }
 
+function normalizeCategoryRanks(value: z.infer<typeof categoryRanksResponseSchema>): EthosCategoryRanksResult {
+  return {
+    categoryRanks: value.categoryRanks.map((item): EthosCategoryRank => ({
+      rank: item.rank,
+      category: {
+        id: item.category.id,
+        slug: item.category.slug ?? null,
+        name: item.category.name,
+        description: item.category.description ?? null,
+        showOnLeaderboard: item.category.showOnLeaderboard,
+        showInDailyService: item.category.showInDailyService,
+        bannerImageUrl: item.category.bannerImageUrl ?? null,
+        userCount: item.category.userCount
+      }
+    }))
+  };
+}
+
+function startCase(input: string) {
+  return input
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function normalizeActivitySummary(raw: unknown): EthosActivitySummary | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+
+  const record = pickFirstRecord(raw, ["activity", "item"]);
+  const author = asRecord(record.author);
+  const subject = asRecord(record.subject);
+  const type = pickString(record, ["type", "activityType"], "activity");
+  const createdAt = pickString(record, ["createdAt", "timestamp"], "");
+  const title =
+    pickString(record, ["title", "comment", "content", "description", "reason"], "") ||
+    [pickString(author, ["displayName", "username"], ""), pickString(subject, ["displayName", "username"], "")]
+      .filter(Boolean)
+      .join(" -> ") ||
+    `${startCase(type)} activity`;
+  const score = pickNumber(record, ["score", "points", "votes"], Number.NaN);
+
+  return {
+    type,
+    title,
+    createdAt: createdAt || null,
+    score: Number.isFinite(score) ? score : null
+  };
+}
+
+function normalizeActivityFeed(value: z.infer<typeof activityFeedSchema>): EthosActivityFeedResult {
+  return {
+    total: value.total,
+    limit: value.limit,
+    offset: value.offset,
+    values: value.values.map(normalizeActivitySummary).filter((item): item is EthosActivitySummary => Boolean(item))
+  };
+}
+
 export class EthosClient {
   readonly baseUrl: string;
 
@@ -462,6 +589,44 @@ export class EthosClient {
       userSchema.parse(value)
     );
     return normalizeUser(data);
+  }
+
+  async getUsersByX(accountIdsOrUsernames: string[], options: ProviderRequestOptions = {}) {
+    const normalized = Array.from(
+      new Set(
+        accountIdsOrUsernames
+          .map((value) => value.trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (normalized.length === 0) {
+      return new Map<string, EthosUserByXResult>();
+    }
+
+    const { data } = await fetchJson(
+      "ethos",
+      `${this.baseUrl}/users/by/x`,
+      this.withHeaders({
+        ...options,
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(options.headers ?? {})
+        },
+        body: JSON.stringify({
+          accountIdsOrUsernames: normalized.slice(0, 500)
+        })
+      }),
+      (value) => z.array(userSchema).parse(value)
+    );
+
+    return new Map(
+      data
+        .map(normalizeUser)
+        .filter((user) => Boolean(user.username))
+        .map((user) => [user.username!.trim().toLowerCase(), user] as const)
+    );
   }
 
   async getScoreLevel(userkey: string, options: ProviderRequestOptions = {}): Promise<EthosScoreLevelResult> {
@@ -601,6 +766,67 @@ export class EthosClient {
     }
 
     return vouches;
+  }
+
+  async getUserCategoryRanks(userkey: string, options: ProviderRequestOptions = {}): Promise<EthosCategoryRanksResult> {
+    const { data } = await fetchJson(
+      "ethos",
+      `${this.baseUrl}/users/${encodeURIComponent(userkey)}/categories`,
+      this.withHeaders(options),
+      (value) => categoryRanksResponseSchema.parse(value)
+    );
+
+    return normalizeCategoryRanks(data);
+  }
+
+  async getProfileActivities(
+    userkey: string,
+    options: ProviderRequestOptions & { limit?: number; excludeSpam?: boolean; excludeHistorical?: boolean } = {}
+  ): Promise<EthosActivityFeedResult> {
+    const limit = Math.max(1, Math.min(options.limit ?? 6, 25));
+    const excludeSpam = options.excludeSpam ?? true;
+    const excludeHistorical = options.excludeHistorical ?? true;
+    const requestOptions = this.withHeaders({ ...options });
+    delete (requestOptions as { limit?: number }).limit;
+    delete (requestOptions as { excludeSpam?: boolean }).excludeSpam;
+    delete (requestOptions as { excludeHistorical?: boolean }).excludeHistorical;
+
+    const { data } = await fetchJson(
+      "ethos",
+      `${this.baseUrl}/activities/profile/all`,
+      {
+        ...requestOptions,
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(requestOptions.headers ?? {})
+        },
+        body: JSON.stringify({
+          userkey,
+          limit,
+          excludeSpam,
+          excludeHistorical,
+          orderBy: {
+            field: "timestamp",
+            direction: "desc"
+          }
+        })
+      },
+      (value) => activityFeedSchema.parse(value)
+    );
+
+    return normalizeActivityFeed(data);
+  }
+
+  async getXpMultipliers(profileId: number, options: ProviderRequestOptions = {}): Promise<EthosXpMultipliers> {
+    const { data } = await fetchJson(
+      "ethos",
+      `${this.baseUrl}/xp/dashboard/multipliers/${profileId}`,
+      this.withHeaders(options),
+      (value) => xpMultipliersSchema.parse(value)
+    );
+
+    return data;
   }
 }
 

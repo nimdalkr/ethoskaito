@@ -257,6 +257,9 @@ export function getDemoUserDetail(userkey: string) {
     mentionCount: mentions.length,
     firstMentionCount: firstMentions.length,
     hitRate: mentions.length > 0 ? firstMentions.length / mentions.length : 0,
+    categories: [],
+    recentActivities: [],
+    xpMultipliers: null,
     projects: firstMentions.map((mention) => ({
       projectId: mention.projectId,
       projectName: demoProjects.find((project) => project.id === mention.projectId)?.name ?? mention.projectId,

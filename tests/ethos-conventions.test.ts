@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEthosUserSnapshot, toEthosXUsernameUserkey } from "@/lib/data/users";
+import { buildEthosUserSnapshot } from "@/lib/data/users";
+import { pickCanonicalEthosUserkey, toEthosXUsernameUserkey } from "@/lib/ethos/identity";
 import { buildEthosHeaders } from "@/lib/providers/ethos";
 
 describe("ethos conventions", () => {
@@ -37,5 +38,15 @@ describe("ethos conventions", () => {
   it("adds the X-Ethos-Client header to Ethos requests", () => {
     const headers = buildEthosHeaders();
     expect(headers.get("X-Ethos-Client")).toBeTruthy();
+  });
+
+  it("prefers canonical ethos userkeys over bare usernames", () => {
+    expect(
+      pickCanonicalEthosUserkey({
+        userkeys: [],
+        username: "ExampleUser",
+        id: 42
+      })
+    ).toBe("service:x.com:username:exampleuser");
   });
 });

@@ -1,11 +1,7 @@
 import { prisma } from "@/lib/db";
 import { computeTrustComposite, fallbackLevelFromScore, getTrustTier } from "@/lib/analytics/tier";
+import { pickCanonicalEthosUserkey, toEthosXUsernameUserkey } from "@/lib/ethos/identity";
 import type { EthosStats, EthosUserSnapshot } from "@/lib/types/domain";
-
-export function toEthosXUsernameUserkey(username: string) {
-  const normalized = username.trim().replace(/^@+/, "").toLowerCase();
-  return `service:x.com:username:${normalized}`;
-}
 
 function toStats(rawUser: any): EthosStats {
   return {
@@ -31,7 +27,11 @@ function toStats(rawUser: any): EthosStats {
 
 export function buildEthosUserSnapshot(rawUser: any, level?: string): EthosUserSnapshot {
   const userkeys = Array.isArray(rawUser?.userkeys) ? rawUser.userkeys.filter(Boolean) : [];
-  const userkey = userkeys[0] ?? (rawUser?.username ? toEthosXUsernameUserkey(rawUser.username) : String(rawUser?.id ?? ""));
+  const userkey = pickCanonicalEthosUserkey({
+    userkeys,
+    username: rawUser?.username ?? null,
+    id: rawUser?.id ?? null
+  });
   const stats = toStats(rawUser);
   const score = Number(rawUser?.score ?? 0);
   const trustComposite = computeTrustComposite({

@@ -69,6 +69,62 @@ export interface EthosProfilesPageResult {
   users: EthosUserByXResult[];
 }
 
+export interface EthosCategoryRank {
+  rank: number;
+  category: {
+    id: number;
+    slug: string | null;
+    name: string;
+    description: string | null;
+    showOnLeaderboard: boolean;
+    showInDailyService: boolean;
+    bannerImageUrl: string | null;
+    userCount: number;
+  };
+}
+
+export interface EthosCategoryRanksResult {
+  categoryRanks: EthosCategoryRank[];
+}
+
+export interface EthosActivitySummary {
+  type: string;
+  title: string;
+  createdAt: string | null;
+  score: number | null;
+}
+
+export interface EthosActivityFeedResult {
+  total: number;
+  limit: number;
+  offset: number;
+  values: EthosActivitySummary[];
+}
+
+export interface EthosXpMultipliers {
+  scoreMultiplier: {
+    value: number;
+    score: number;
+    tier: string;
+    nextTier: {
+      threshold: number;
+      multiplier: number;
+    } | null;
+  };
+  streakMultiplier: {
+    value: number;
+    streakDays: number;
+    tier: string;
+    nextTier: {
+      threshold: number;
+      multiplier: number;
+    } | null;
+  };
+  validatorCount: number;
+  marketHoldingsEth: number;
+  combinedMultiplier: number;
+}
+
 export interface EthosProjectCategory {
   id: number;
   name: string;
