@@ -99,13 +99,15 @@ The sync will:
 Trigger the internal collector with:
 
 ```bash
-curl -X POST "http://localhost:3000/api/cron/collect?accounts=20&tweets=5" \
+curl -X POST "http://localhost:3000/api/cron/collect?accounts=100&tweets=5&concurrency=5" \
   -H "authorization: Bearer $CRON_SECRET"
 ```
 
 The collector will:
 
 - ensure tracked project usernames exist when the tracker is still sparse
+- prioritize never-collected accounts first, then rotate through the oldest collected accounts
 - fetch the latest tweet IDs from X guest GraphQL
 - skip tweet IDs already stored in the database
 - pass unseen tweets into the existing FxTwitter-based ingest pipeline
+- store per-account collection status on `TrackedAccount`

@@ -86,6 +86,40 @@ export function buildEthosUserWriteData(snapshot: EthosUserSnapshot, raw: unknow
 
 export async function upsertEthosUser(snapshot: EthosUserSnapshot, raw: unknown) {
   const data = buildEthosUserWriteData(snapshot, raw);
+  const existingByProfileId =
+    snapshot.profileId !== null
+      ? await prisma.ethosUser.findUnique({
+          where: {
+            profileId: snapshot.profileId
+          },
+          select: {
+            id: true,
+            userkey: true
+          }
+        })
+      : null;
+
+  if (existingByProfileId) {
+    const existingByUserkey = await prisma.ethosUser.findUnique({
+      where: {
+        userkey: snapshot.userkey
+      },
+      select: {
+        id: true
+      }
+    });
+
+    return prisma.ethosUser.update({
+      where: {
+        id: existingByProfileId.id
+      },
+      data: {
+        ...data,
+        userkey: !existingByUserkey || existingByUserkey.id === existingByProfileId.id ? snapshot.userkey : existingByProfileId.userkey
+      }
+    });
+  }
+
   return prisma.ethosUser.upsert({
     where: { userkey: snapshot.userkey },
     update: data,

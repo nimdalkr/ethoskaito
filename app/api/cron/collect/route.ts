@@ -26,9 +26,11 @@ export async function POST(request: NextRequest) {
   const url = new URL(request.url);
   const accountLimit = parsePositiveInt(url.searchParams.get("accounts"), 20);
   const tweetsPerAccount = parsePositiveInt(url.searchParams.get("tweets"), 5);
+  const concurrency = parsePositiveInt(url.searchParams.get("concurrency"), 5);
   const result = await collectTrackedTweets({
     accountLimit,
-    tweetsPerAccount
+    tweetsPerAccount,
+    concurrency
   });
 
   return NextResponse.json(result);
