@@ -1,5 +1,4 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FilterBar } from "@/components/dashboard/filter-bar";
@@ -34,10 +33,6 @@ export default async function Page() {
               <p className="hero-copy">
                 Track which trust tier sees a project first, how that signal spreads, and whether the market later validates it.
               </p>
-            </div>
-            <div className="button-row">
-              <Button>Export snapshot</Button>
-              <Button variant="secondary">Refresh flow</Button>
             </div>
           </div>
           <FilterBar />

@@ -20,6 +20,21 @@ async function ensureAliasesLoaded() {
   });
 }
 
+function matchProjectsForTweet(input: {
+  text: string;
+  xUsername: string;
+  aliasCandidates: Array<{ projectId: string; aliases: string[] }>;
+}) {
+  const textMatches = matchProjectsByText(input.text, input.aliasCandidates);
+  const handleMatches = input.aliasCandidates
+    .filter((candidate) =>
+      candidate.aliases.some((alias) => alias.trim().toLowerCase() === input.xUsername.trim().toLowerCase())
+    )
+    .map((candidate) => candidate.projectId);
+
+  return [...new Set([...textMatches, ...handleMatches])];
+}
+
 export async function ingestTweetBatch(input: IngestBatchInput) {
   const projects = await ensureAliasesLoaded();
   const aliasCandidates = projects.map((project: any) => ({
@@ -90,7 +105,11 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
       }
     });
 
-    const matchedProjectIds = matchProjectsByText(normalizedTweet.text, aliasCandidates);
+    const matchedProjectIds = matchProjectsForTweet({
+      text: normalizedTweet.text,
+      xUsername: normalizedTweet.xUsername,
+      aliasCandidates
+    });
 
     for (const projectId of matchedProjectIds) {
       const firstMention = await prisma.projectMention.findFirst({

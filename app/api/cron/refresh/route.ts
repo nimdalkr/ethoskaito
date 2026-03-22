@@ -40,46 +40,56 @@ export async function POST(request: NextRequest) {
   });
 
   let outcomesUpdated = 0;
+  const failures: Array<{ projectId: string; symbol: string; reason: string }> = [];
 
   for (const mapping of mappings) {
-    const snapshot = await priceClient.getProjectOutcomeSnapshot({
-      symbol: mapping.symbol,
-      from: mapping.project.createdAt.toISOString()
-    });
+    try {
+      const snapshot = await priceClient.getProjectOutcomeSnapshot({
+        symbol: mapping.symbol,
+        from: mapping.project.createdAt.toISOString()
+      });
 
-    await prisma.projectOutcome.upsert({
-      where: {
-        projectId_source_symbol: {
+      await prisma.projectOutcome.upsert({
+        where: {
+          projectId_source_symbol: {
+            projectId: mapping.projectId,
+            source: mapping.source,
+            symbol: mapping.symbol
+          }
+        },
+        update: {
+          firstPriceAt: snapshot.points[0]?.at ? new Date(snapshot.points[0].at) : null,
+          latestPriceAt: snapshot.points.at(-1)?.at ? new Date(snapshot.points.at(-1)!.at) : null,
+          return1d: pickReturn(snapshot.points, 1),
+          return7d: pickReturn(snapshot.points, 7),
+          return30d: pickReturn(snapshot.points, 30),
+          raw: snapshot as any
+        },
+        create: {
           projectId: mapping.projectId,
           source: mapping.source,
-          symbol: mapping.symbol
+          symbol: mapping.symbol,
+          firstPriceAt: snapshot.points[0]?.at ? new Date(snapshot.points[0].at) : null,
+          latestPriceAt: snapshot.points.at(-1)?.at ? new Date(snapshot.points.at(-1)!.at) : null,
+          return1d: pickReturn(snapshot.points, 1),
+          return7d: pickReturn(snapshot.points, 7),
+          return30d: pickReturn(snapshot.points, 30),
+          raw: snapshot as any
         }
-      },
-      update: {
-        firstPriceAt: snapshot.points[0]?.at ? new Date(snapshot.points[0].at) : null,
-        latestPriceAt: snapshot.points.at(-1)?.at ? new Date(snapshot.points.at(-1)!.at) : null,
-        return1d: pickReturn(snapshot.points, 1),
-        return7d: pickReturn(snapshot.points, 7),
-        return30d: pickReturn(snapshot.points, 30),
-        raw: snapshot as any
-      },
-      create: {
+      });
+      outcomesUpdated += 1;
+    } catch (error) {
+      failures.push({
         projectId: mapping.projectId,
-        source: mapping.source,
         symbol: mapping.symbol,
-        firstPriceAt: snapshot.points[0]?.at ? new Date(snapshot.points[0].at) : null,
-        latestPriceAt: snapshot.points.at(-1)?.at ? new Date(snapshot.points.at(-1)!.at) : null,
-        return1d: pickReturn(snapshot.points, 1),
-        return7d: pickReturn(snapshot.points, 7),
-        return30d: pickReturn(snapshot.points, 30),
-        raw: snapshot as any
-      }
-    });
-    outcomesUpdated += 1;
+        reason: error instanceof Error ? error.message : "Unknown price sync error"
+      });
+    }
   }
 
   return NextResponse.json({
     syncedProjects,
-    outcomesUpdated
+    outcomesUpdated,
+    failures
   });
 }

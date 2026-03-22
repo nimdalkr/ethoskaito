@@ -16,11 +16,18 @@ function buildProjectAliases(project: any) {
     candidates.add(match.replace("$", ""));
   }
 
-  return [...candidates]
-    .map((alias) => alias.trim())
-    .filter(Boolean)
-    .map((alias) => ({ alias, normalizedAlias: normalizeToken(alias) }))
-    .filter((alias) => alias.normalizedAlias.length >= 3);
+  const aliasMap = new Map<string, { alias: string; normalizedAlias: string }>();
+
+  for (const alias of [...candidates].map((value) => value.trim()).filter(Boolean)) {
+    const normalizedAlias = normalizeToken(alias);
+    if (normalizedAlias.length < 3) {
+      continue;
+    }
+
+    aliasMap.set(normalizedAlias, { alias, normalizedAlias });
+  }
+
+  return [...aliasMap.values()];
 }
 
 export async function syncProjectCatalog() {
@@ -68,7 +75,8 @@ export async function syncProjectCatalog() {
           projectId: record.id,
           alias: entry.alias,
           normalizedAlias: entry.normalizedAlias
-        }))
+        })),
+        skipDuplicates: true
       });
     }
 
