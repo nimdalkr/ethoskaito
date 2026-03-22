@@ -108,7 +108,7 @@ export default async function Page() {
         <FilterBar />
         <div className="metric-grid">
           <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
-          <MetricCard label="Signal authors" value={model.users.length} delta="Ranked by trust composite" />
+          <MetricCard label="Signal authors" value={model.totalUsers} delta="Ethos profiles synced" />
           <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh live signals captured" />
           <MetricCard label="Weighted mentions" value={totalWeightedMentions} delta="Tier-weighted signal volume" />
         </div>
@@ -196,7 +196,7 @@ export default async function Page() {
           <CardContent className="stack-3">
             <div className="panel-line">
               <span>Tracked accounts</span>
-              <strong>{model.users.length}</strong>
+              <strong>{model.totalTrackedAccounts}</strong>
             </div>
             <div className="panel-line">
               <span>Current first-call density</span>

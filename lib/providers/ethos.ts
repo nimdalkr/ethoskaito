@@ -5,6 +5,7 @@ import { fetchJson, pickString, pickNumber, isRecord, asRecord } from "@/lib/pro
 import type {
   EthosProjectCategory,
   EthosProjectChain,
+  EthosProfilesPageResult,
   EthosProjectResult,
   EthosProjectVoter,
   EthosProjectVotes,
@@ -149,6 +150,21 @@ const projectSchema = z
 const projectsResponseSchema = z.object({
   projects: z.array(projectSchema),
   total: z.number()
+});
+
+const profilesPageSchema = z.object({
+  total: z.number(),
+  limit: z.number(),
+  offset: z.number(),
+  values: z
+    .array(
+      z
+        .object({
+          user: userSchema
+        })
+        .passthrough()
+    )
+    .default([])
 });
 
 const vouchUserSchema = z.object({
@@ -487,6 +503,46 @@ export class EthosClient {
     }
 
     return projects;
+  }
+
+  async getProfilesPage(
+    options: ProviderRequestOptions & { limit?: number; offset?: number; archived?: boolean } = {}
+  ): Promise<EthosProfilesPageResult> {
+    const limit = Math.max(1, Math.min(options.limit ?? 500, 500));
+    const offset = Math.max(0, options.offset ?? 0);
+    const archived = options.archived ?? false;
+    const requestOptions = { ...options };
+    delete (requestOptions as { limit?: number }).limit;
+    delete (requestOptions as { offset?: number }).offset;
+    delete (requestOptions as { archived?: boolean }).archived;
+
+    const { data } = await fetchJson(
+      "ethos",
+      `${this.baseUrl}/profiles`,
+      {
+        ...requestOptions,
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(requestOptions.headers ?? {})
+        },
+        body: JSON.stringify({
+          archived,
+          limit,
+          offset,
+          sortField: "createdAt",
+          sortDirection: "desc"
+        })
+      },
+      (value) => profilesPageSchema.parse(value)
+    );
+
+    return {
+      total: data.total,
+      limit: data.limit,
+      offset: data.offset,
+      users: data.values.map((entry) => normalizeUser(entry.user))
+    };
   }
 
   async getProjectById(projectId: string | number, options: ProviderRequestOptions = {}): Promise<EthosProjectResult> {

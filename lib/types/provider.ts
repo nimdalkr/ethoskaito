@@ -62,6 +62,13 @@ export interface EthosScoreLevelResult {
   trustTier: TrustTier;
 }
 
+export interface EthosProfilesPageResult {
+  total: number;
+  limit: number;
+  offset: number;
+  users: EthosUserByXResult[];
+}
+
 export interface EthosProjectCategory {
   id: number;
   name: string;

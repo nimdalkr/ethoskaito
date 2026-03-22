@@ -170,7 +170,9 @@ export function getDemoHomePageModel() {
     users: demoUsers,
     outcomes: demoOutcomes,
     mentions: demoMentions,
-    tierRollups: demoTierRollups
+    tierRollups: demoTierRollups,
+    totalUsers: demoUsers.length,
+    totalTrackedAccounts: demoUsers.filter((user) => Boolean(user.username)).length
   };
 }
 

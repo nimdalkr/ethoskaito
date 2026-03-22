@@ -58,55 +58,40 @@ export function buildEthosUserSnapshot(rawUser: any, level?: string): EthosUserS
   };
 }
 
+export function buildEthosUserWriteData(snapshot: EthosUserSnapshot, raw: unknown) {
+  return {
+    profileId: snapshot.profileId,
+    username: snapshot.username,
+    displayName: snapshot.displayName,
+    avatarUrl: snapshot.avatarUrl,
+    description: snapshot.description,
+    score: snapshot.score,
+    level: snapshot.level,
+    influenceFactor: snapshot.influenceFactor,
+    influenceFactorPercentile: snapshot.influenceFactorPercentile,
+    humanVerificationStatus: snapshot.humanVerificationStatus,
+    validatorNftCount: snapshot.validatorNftCount,
+    xpTotal: snapshot.xpTotal,
+    xpStreakDays: snapshot.xpStreakDays,
+    reviewPositive: snapshot.stats.review.received.positive,
+    reviewNeutral: snapshot.stats.review.received.neutral,
+    reviewNegative: snapshot.stats.review.received.negative,
+    vouchGivenCount: snapshot.stats.vouch.given.count,
+    vouchReceivedCount: snapshot.stats.vouch.received.count,
+    trustComposite: snapshot.trustComposite,
+    trustTier: snapshot.trustTier,
+    raw: raw as any
+  };
+}
+
 export async function upsertEthosUser(snapshot: EthosUserSnapshot, raw: unknown) {
+  const data = buildEthosUserWriteData(snapshot, raw);
   return prisma.ethosUser.upsert({
     where: { userkey: snapshot.userkey },
-    update: {
-      profileId: snapshot.profileId,
-      username: snapshot.username,
-      displayName: snapshot.displayName,
-      avatarUrl: snapshot.avatarUrl,
-      description: snapshot.description,
-      score: snapshot.score,
-      level: snapshot.level,
-      influenceFactor: snapshot.influenceFactor,
-      influenceFactorPercentile: snapshot.influenceFactorPercentile,
-      humanVerificationStatus: snapshot.humanVerificationStatus,
-      validatorNftCount: snapshot.validatorNftCount,
-      xpTotal: snapshot.xpTotal,
-      xpStreakDays: snapshot.xpStreakDays,
-      reviewPositive: snapshot.stats.review.received.positive,
-      reviewNeutral: snapshot.stats.review.received.neutral,
-      reviewNegative: snapshot.stats.review.received.negative,
-      vouchGivenCount: snapshot.stats.vouch.given.count,
-      vouchReceivedCount: snapshot.stats.vouch.received.count,
-      trustComposite: snapshot.trustComposite,
-      trustTier: snapshot.trustTier,
-      raw: raw as any
-    },
+    update: data,
     create: {
       userkey: snapshot.userkey,
-      profileId: snapshot.profileId,
-      username: snapshot.username,
-      displayName: snapshot.displayName,
-      avatarUrl: snapshot.avatarUrl,
-      description: snapshot.description,
-      score: snapshot.score,
-      level: snapshot.level,
-      influenceFactor: snapshot.influenceFactor,
-      influenceFactorPercentile: snapshot.influenceFactorPercentile,
-      humanVerificationStatus: snapshot.humanVerificationStatus,
-      validatorNftCount: snapshot.validatorNftCount,
-      xpTotal: snapshot.xpTotal,
-      xpStreakDays: snapshot.xpStreakDays,
-      reviewPositive: snapshot.stats.review.received.positive,
-      reviewNeutral: snapshot.stats.review.received.neutral,
-      reviewNegative: snapshot.stats.review.received.negative,
-      vouchGivenCount: snapshot.stats.vouch.given.count,
-      vouchReceivedCount: snapshot.stats.vouch.received.count,
-      trustComposite: snapshot.trustComposite,
-      trustTier: snapshot.trustTier,
-      raw: raw as any
+      ...data
     }
   });
 }

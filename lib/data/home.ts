@@ -8,7 +8,9 @@ function getEmptyHomePageModel() {
     users: [] as EthosUserSnapshot[],
     outcomes: [] as ProjectOutcome[],
     mentions: [] as ProjectMention[],
-    tierRollups: [] as TierRollup[]
+    tierRollups: [] as TierRollup[],
+    totalUsers: 0,
+    totalTrackedAccounts: 0
   };
 }
 
@@ -18,7 +20,7 @@ export async function getHomePageModel() {
   }
 
   try {
-  const projects = await prisma.project.findMany({
+    const projects = await prisma.project.findMany({
       include: { aliases: true },
       orderBy: [{ totalVotes: "desc" }, { updatedAt: "desc" }],
       take: 16
@@ -35,6 +37,12 @@ export async function getHomePageModel() {
       include: { tweet: true },
       orderBy: { mentionedAt: "desc" },
       take: 200
+    });
+    const totalUsers = await prisma.ethosUser.count();
+    const totalTrackedAccounts = await prisma.trackedAccount.count({
+      where: {
+        isActive: true
+      }
     });
 
   const projectSnapshots: ProjectSnapshot[] = projects.map((project: any) => ({
@@ -150,7 +158,9 @@ export async function getHomePageModel() {
     users: userSnapshots,
     outcomes: projectOutcomes,
     mentions: normalizedMentions,
-    tierRollups: [...tierRollupMap.values()]
+    tierRollups: [...tierRollupMap.values()],
+    totalUsers,
+    totalTrackedAccounts
   };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {

@@ -44,6 +44,7 @@ npm run dev
 ## Key Routes
 
 - `POST /api/ingest/tweets`
+- `POST /api/cron/sync-users`
 - `POST /api/cron/collect`
 - `POST /api/cron/refresh`
 - `GET /api/projects`
@@ -73,9 +74,25 @@ Provide `x-api-key: <INGEST_API_KEY>` when calling the ingest route.
 ## Notes
 
 - The app expects an external collector to supply tweet IDs or URLs.
-- A built-in collector can now discover recent tweets from tracked Ethos project accounts through X guest GraphQL and then expand each tweet through FxTwitter.
+- A built-in sync route can now backfill the full Ethos profile pool via `/profiles`.
+- The collector discovers recent tweets from tracked Ethos usernames through X guest GraphQL and then expands each tweet through FxTwitter.
 - Project catalog sync uses Ethos `projects`.
 - Price mappings are seeded from project usernames and should be reviewed for accuracy.
+
+## User Pool Sync
+
+Backfill the Ethos user pool with:
+
+```bash
+curl -X POST "http://localhost:3000/api/cron/sync-users?limit=500&pages=10" \
+  -H "authorization: Bearer $CRON_SECRET"
+```
+
+The sync will:
+
+- page through the Ethos `/profiles` endpoint
+- upsert every Ethos user into `EthosUser`
+- add users with X usernames into `TrackedAccount`
 
 ## Collector
 
@@ -88,7 +105,7 @@ curl -X POST "http://localhost:3000/api/cron/collect?accounts=20&tweets=5" \
 
 The collector will:
 
-- ensure tracked accounts exist for Ethos project usernames
+- ensure tracked project usernames exist when the tracker is still sparse
 - fetch the latest tweet IDs from X guest GraphQL
 - skip tweet IDs already stored in the database
 - pass unseen tweets into the existing FxTwitter-based ingest pipeline
