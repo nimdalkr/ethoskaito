@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { buildEthosUserSnapshot, buildEthosUserWriteData } from "@/lib/data/users";
+import { buildEthosUserSnapshot, buildEthosUserWriteData, buildTrackedAccountWriteData } from "@/lib/data/users";
 import { ethosClient } from "@/lib/providers/ethos";
 import type { EthosUserSnapshot } from "@/lib/types/domain";
 
@@ -119,10 +119,12 @@ export async function syncEthosUserPool(options: {
     if (newTrackedAccounts.length > 0) {
       await prisma.trackedAccount.createMany({
         data: newTrackedAccounts.map((account) => ({
-          xUsername: account.xUsername,
-          ethosUserkey: account.ethosUserkey,
-          source: account.source,
-          isActive: true
+          ...buildTrackedAccountWriteData({
+            xUsername: account.xUsername,
+            ethosUserkey: account.ethosUserkey,
+            source: account.source,
+            trustComposite: snapshots.find((snapshot) => snapshot.userkey === account.ethosUserkey)?.trustComposite ?? null
+          })
         })),
         skipDuplicates: true
       });
@@ -131,12 +133,20 @@ export async function syncEthosUserPool(options: {
 
     if (refreshExisting) {
       for (const account of existingTracked) {
+        const scheduling = buildTrackedAccountWriteData({
+          xUsername: account.xUsername,
+          ethosUserkey: account.ethosUserkey,
+          source: account.source,
+          trustComposite: snapshots.find((snapshot) => snapshot.userkey === account.ethosUserkey)?.trustComposite ?? null
+        });
         await prisma.trackedAccount.update({
           where: { xUsername: account.xUsername },
           data: {
             ethosUserkey: account.ethosUserkey,
             source: account.source,
-            isActive: true
+            isActive: true,
+            assignedShardId: scheduling.assignedShardId,
+            priorityScore: scheduling.priorityScore
           }
         });
         updatedTrackedAccounts += 1;

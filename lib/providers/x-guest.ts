@@ -393,6 +393,11 @@ export class XGuestClient {
     return { config, guestToken } satisfies GuestSession;
   }
 
+  async withSession<T>(worker: (session: GuestSession) => Promise<T>) {
+    const session = await this.getSession();
+    return worker(session);
+  }
+
   private async fetchGraphql(
     session: GuestSession,
     input: {
@@ -460,12 +465,12 @@ export class XGuestClient {
     return this.getUserRestIdByUsernameWithSession(session, xUsername);
   }
 
-  async getRecentTweetsByUsername(input: { xUsername: string; count?: number }) {
-    const session = await this.getSession();
-    const userId = await this.getUserRestIdByUsernameWithSession(session, input.xUsername);
+  async getRecentTweetsByUsername(input: { xUsername: string; count?: number }, session?: GuestSession) {
+    const activeSession = session ?? (await this.getSession());
+    const userId = await this.getUserRestIdByUsernameWithSession(activeSession, input.xUsername);
     const count = Math.max(1, Math.min(input.count ?? 5, 20));
-    const data = await this.fetchGraphql(session, {
-      queryId: session.config.userTweetsQueryId,
+    const data = await this.fetchGraphql(activeSession, {
+      queryId: activeSession.config.userTweetsQueryId,
       operationName: "UserTweets",
       variables: {
         userId,

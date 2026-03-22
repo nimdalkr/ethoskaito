@@ -122,3 +122,24 @@ export interface TierRollup {
   uniqueAuthors: number;
   firstMentionAt: string | null;
 }
+
+export interface CollectorOpsSummary {
+  totalTrackedAccounts: number;
+  coveredLast24h: number;
+  coveragePct: number;
+  dueNow: number;
+  failedAccounts: number;
+  latestRun: {
+    mode: string;
+    status: string;
+    startedAt: string;
+    completedAt: string | null;
+    selectedAccounts: number;
+    processedAccounts: number;
+    errorCount: number;
+    shardId: number | null;
+  } | null;
+  latestMainCompletedAt: string | null;
+  latestRepairCompletedAt: string | null;
+  latestHotCompletedAt: string | null;
+}

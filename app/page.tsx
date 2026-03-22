@@ -9,6 +9,7 @@ import { ProjectHeatmap } from "@/components/project/project-heatmap";
 import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
 import { UserSummaryList } from "@/components/user/user-summary-list";
 import { getTrustTierLabel } from "@/lib/analytics/tier";
+import { getCollectorModeLabel } from "@/lib/collector/scheduling";
 import { getHomePageModel } from "@/lib/data/home";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function Page() {
         .reduce((sum, row) => sum + row.weightedMentions, 0)
     }))
     .sort((left, right) => right.weightedMentions - left.weightedMentions)[0];
+  const collector = model.collectorSummary;
 
   return (
     <DashboardShell
@@ -99,6 +101,10 @@ export default async function Page() {
                   {validatedProjects} / {model.outcomes.length}
                 </strong>
               </div>
+              <div className="hero-strip-card">
+                <span>24h coverage</span>
+                <strong>{collector.coveragePct}%</strong>
+              </div>
             </div>
           </div>
         </section>
@@ -110,7 +116,7 @@ export default async function Page() {
           <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
           <MetricCard label="Signal authors" value={model.totalUsers} delta="Ethos profiles synced" />
           <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh live signals captured" />
-          <MetricCard label="Weighted mentions" value={totalWeightedMentions} delta="Tier-weighted signal volume" />
+          <MetricCard label="24h collector coverage" value={`${collector.coveragePct}%`} delta={`${collector.coveredLast24h} of ${collector.totalTrackedAccounts} accounts`} />
         </div>
       </section>
 
@@ -170,12 +176,41 @@ export default async function Page() {
         <ProjectDetailPanel projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
         <Card variant="surface">
           <CardHeader>
-            <CardTitle>Operating notes</CardTitle>
+            <CardTitle>Collector operations</CardTitle>
           </CardHeader>
-          <CardContent className="stack-3 muted-copy">
-            <p>The dashboard now reads from the local database models rather than mock arrays.</p>
-            <p>If the board looks sparse, run the collector and refresh routes to ingest newer tweets and outcome snapshots.</p>
-            <p>Outcome cells remain blank until a market mapping resolves to a price source symbol.</p>
+          <CardContent className="stack-3">
+            <div className="panel-line">
+              <span>24h covered accounts</span>
+              <strong>
+                {collector.coveredLast24h} / {collector.totalTrackedAccounts}
+              </strong>
+            </div>
+            <div className="panel-line">
+              <span>Due right now</span>
+              <strong>{collector.dueNow}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Accounts with failures</span>
+              <strong>{collector.failedAccounts}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Last main sweep</span>
+              <strong>{collector.latestMainCompletedAt ? new Date(collector.latestMainCompletedAt).toLocaleString() : "Not completed yet"}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Last repair sweep</span>
+              <strong>{collector.latestRepairCompletedAt ? new Date(collector.latestRepairCompletedAt).toLocaleString() : "Not completed yet"}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Last hot sweep</span>
+              <strong>{collector.latestHotCompletedAt ? new Date(collector.latestHotCompletedAt).toLocaleString() : "Not completed yet"}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Most recent run</span>
+              <strong>
+                {collector.latestRun ? `${getCollectorModeLabel(collector.latestRun.mode as any)} · ${collector.latestRun.status}` : "No collector run yet"}
+              </strong>
+            </div>
           </CardContent>
         </Card>
       </section>
@@ -204,7 +239,7 @@ export default async function Page() {
             </div>
             <div className="panel-line">
               <span>Collector mode</span>
-              <strong>Live signal tracking</strong>
+              <strong>Main + repair + hot lane</strong>
             </div>
           </CardContent>
         </Card>

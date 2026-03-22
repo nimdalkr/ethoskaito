@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isDatabaseConfigured } from "@/lib/db";
+import type { CollectorMode } from "@/lib/collector/scheduling";
 import { env } from "@/lib/env";
 import { collectTrackedTweets } from "@/lib/ingest/collect-tracked-tweets";
 
@@ -24,13 +25,19 @@ export async function POST(request: NextRequest) {
   }
 
   const url = new URL(request.url);
+  const mode = (url.searchParams.get("mode") ?? "main") as CollectorMode;
   const accountLimit = parsePositiveInt(url.searchParams.get("accounts"), 20);
   const tweetsPerAccount = parsePositiveInt(url.searchParams.get("tweets"), 5);
   const concurrency = parsePositiveInt(url.searchParams.get("concurrency"), 5);
+  const shardId = url.searchParams.get("shard");
+  const shardCount = parsePositiveInt(url.searchParams.get("shards"), 40);
   const result = await collectTrackedTweets({
     accountLimit,
     tweetsPerAccount,
-    concurrency
+    concurrency,
+    mode,
+    shardId: shardId === null ? null : Number.parseInt(shardId, 10),
+    shardCount
   });
 
   return NextResponse.json(result);

@@ -172,7 +172,18 @@ export function getDemoHomePageModel() {
     mentions: demoMentions,
     tierRollups: demoTierRollups,
     totalUsers: demoUsers.length,
-    totalTrackedAccounts: demoUsers.filter((user) => Boolean(user.username)).length
+    totalTrackedAccounts: demoUsers.filter((user) => Boolean(user.username)).length,
+    collectorSummary: {
+      totalTrackedAccounts: demoUsers.filter((user) => Boolean(user.username)).length,
+      coveredLast24h: 0,
+      coveragePct: 0,
+      dueNow: 0,
+      failedAccounts: 0,
+      latestRun: null,
+      latestMainCompletedAt: null,
+      latestRepairCompletedAt: null,
+      latestHotCompletedAt: null
+    }
   };
 }
 

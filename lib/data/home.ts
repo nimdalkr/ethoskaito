@@ -1,6 +1,6 @@
 import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
 import { getDemoHomePageModel } from "@/lib/data/demo";
-import type { EthosUserSnapshot, ProjectMention, ProjectOutcome, ProjectSnapshot, TierRollup } from "@/lib/types/domain";
+import type { CollectorOpsSummary, EthosUserSnapshot, ProjectMention, ProjectOutcome, ProjectSnapshot, TierRollup } from "@/lib/types/domain";
 
 function getEmptyHomePageModel() {
   return {
@@ -10,7 +10,18 @@ function getEmptyHomePageModel() {
     mentions: [] as ProjectMention[],
     tierRollups: [] as TierRollup[],
     totalUsers: 0,
-    totalTrackedAccounts: 0
+    totalTrackedAccounts: 0,
+    collectorSummary: {
+      totalTrackedAccounts: 0,
+      coveredLast24h: 0,
+      coveragePct: 0,
+      dueNow: 0,
+      failedAccounts: 0,
+      latestRun: null,
+      latestMainCompletedAt: null,
+      latestRepairCompletedAt: null,
+      latestHotCompletedAt: null
+    } satisfies CollectorOpsSummary
   };
 }
 
@@ -42,6 +53,64 @@ export async function getHomePageModel() {
     const totalTrackedAccounts = await prisma.trackedAccount.count({
       where: {
         isActive: true
+      }
+    });
+    const coveredLast24h = await prisma.trackedAccount.count({
+      where: {
+        isActive: true,
+        lastSuccessfulSweepAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+    const dueNow = await prisma.trackedAccount.count({
+      where: {
+        isActive: true,
+        OR: [{ nextEligibleAt: null }, { nextEligibleAt: { lte: new Date() } }]
+      }
+    });
+    const failedAccounts = await prisma.trackedAccount.count({
+      where: {
+        isActive: true,
+        OR: [{ lastCollectorError: { not: null } }, { consecutiveFailures: { gt: 0 } }]
+      }
+    });
+    const latestRun = await prisma.collectorRun.findFirst({
+      orderBy: {
+        startedAt: "desc"
+      }
+    });
+    const latestMainRun = await prisma.collectorRun.findFirst({
+      where: {
+        mode: "main",
+        completedAt: {
+          not: null
+        }
+      },
+      orderBy: {
+        completedAt: "desc"
+      }
+    });
+    const latestRepairRun = await prisma.collectorRun.findFirst({
+      where: {
+        mode: "repair",
+        completedAt: {
+          not: null
+        }
+      },
+      orderBy: {
+        completedAt: "desc"
+      }
+    });
+    const latestHotRun = await prisma.collectorRun.findFirst({
+      where: {
+        mode: "hot",
+        completedAt: {
+          not: null
+        }
+      },
+      orderBy: {
+        completedAt: "desc"
       }
     });
 
@@ -160,7 +229,29 @@ export async function getHomePageModel() {
     mentions: normalizedMentions,
     tierRollups: [...tierRollupMap.values()],
     totalUsers,
-    totalTrackedAccounts
+    totalTrackedAccounts,
+    collectorSummary: {
+      totalTrackedAccounts,
+      coveredLast24h,
+      coveragePct: totalTrackedAccounts > 0 ? Math.round((coveredLast24h / totalTrackedAccounts) * 100) : 0,
+      dueNow,
+      failedAccounts,
+      latestRun: latestRun
+        ? {
+            mode: latestRun.mode,
+            status: latestRun.status,
+            startedAt: latestRun.startedAt.toISOString(),
+            completedAt: latestRun.completedAt?.toISOString() ?? null,
+            selectedAccounts: latestRun.selectedAccounts,
+            processedAccounts: latestRun.processedAccounts,
+            errorCount: latestRun.errorCount,
+            shardId: latestRun.shardId
+          }
+        : null,
+      latestMainCompletedAt: latestMainRun?.completedAt?.toISOString() ?? null,
+      latestRepairCompletedAt: latestRepairRun?.completedAt?.toISOString() ?? null,
+      latestHotCompletedAt: latestHotRun?.completedAt?.toISOString() ?? null
+    }
   };
   } catch (error) {
     if (isDatabaseUnavailable(error)) {

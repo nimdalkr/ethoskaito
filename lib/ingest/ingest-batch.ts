@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { matchProjectsByText } from "@/lib/analytics/project-match";
 import { getTierWeight } from "@/lib/analytics/tier";
 import { syncProjectCatalog } from "@/lib/data/projects";
-import { buildEthosUserSnapshot, upsertEthosUser } from "@/lib/data/users";
+import { buildEthosUserSnapshot, buildTrackedAccountWriteData, upsertEthosUser } from "@/lib/data/users";
 import type { IngestBatchInput } from "@/lib/types/api";
 import { ethosClient } from "@/lib/providers/ethos";
 import { fxTwitterClient } from "@/lib/providers/fxtwitter";
@@ -60,12 +60,23 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
       where: { xUsername: item.xUsername },
       update: {
         ethosUserkey: snapshot.userkey,
-        source: item.source
+        source: item.source,
+        priorityScore: buildTrackedAccountWriteData({
+          xUsername: item.xUsername,
+          ethosUserkey: snapshot.userkey,
+          source: item.source,
+          trustComposite: snapshot.trustComposite,
+          lastObservedTweetAt: normalizedTweet.createdAt
+        }).priorityScore
       },
       create: {
-        xUsername: item.xUsername,
-        ethosUserkey: snapshot.userkey,
-        source: item.source
+        ...buildTrackedAccountWriteData({
+          xUsername: item.xUsername,
+          ethosUserkey: snapshot.userkey,
+          source: item.source,
+          trustComposite: snapshot.trustComposite,
+          lastObservedTweetAt: normalizedTweet.createdAt
+        })
       }
     });
 

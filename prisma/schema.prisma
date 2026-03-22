@@ -8,21 +8,30 @@ datasource db {
 }
 
 model TrackedAccount {
-  id                 String   @id @default(cuid())
-  xUsername          String   @unique
-  ethosUserkey       String?
-  source             String
-  isActive           Boolean  @default(true)
-  lastCollectedAt    DateTime?
-  lastObservedTweetAt DateTime?
-  lastDiscoveredCount Int     @default(0)
-  lastQueuedCount    Int      @default(0)
-  lastProcessedCount Int      @default(0)
-  lastCollectorError String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  xUsername             String    @unique
+  ethosUserkey          String?
+  source                String
+  isActive              Boolean   @default(true)
+  assignedShardId       Int?
+  priorityScore         Int       @default(0)
+  nextEligibleAt        DateTime?
+  lastCollectedAt       DateTime?
+  lastSweepAt           DateTime?
+  lastSuccessfulSweepAt DateTime?
+  lastObservedTweetAt   DateTime?
+  lastDiscoveredCount   Int       @default(0)
+  lastQueuedCount       Int       @default(0)
+  lastProcessedCount    Int       @default(0)
+  consecutiveFailures   Int       @default(0)
+  lastRunMode           String?
+  lastCollectorError    String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  ethosUser             EthosUser? @relation(fields: [ethosUserkey], references: [userkey])
 
-  @@index([isActive, lastCollectedAt])
+  @@index([isActive, nextEligibleAt])
+  @@index([isActive, assignedShardId, lastSuccessfulSweepAt])
 }
 
 model EthosUser {
@@ -52,6 +61,46 @@ model EthosUser {
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
   tweets                    Tweet[]
+  trackedAccounts           TrackedAccount[]
+}
+
+model CollectorRun {
+  id                String   @id @default(cuid())
+  mode              String
+  status            String
+  shardId           Int?
+  shardCount        Int?
+  selectedAccounts  Int      @default(0)
+  processedAccounts Int      @default(0)
+  discoveredTweets  Int      @default(0)
+  queuedTweets      Int      @default(0)
+  ingestedTweets    Int      @default(0)
+  errorCount        Int      @default(0)
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([mode, startedAt])
+}
+
+model CollectorShardState {
+  id                String   @id @default(cuid())
+  mode              String
+  shardId           Int
+  shardCount        Int
+  status            String
+  lastRunId         String?
+  lastStartedAt     DateTime?
+  lastCompletedAt   DateTime?
+  accountsTotal     Int      @default(0)
+  accountsProcessed Int      @default(0)
+  errorCount        Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([mode, shardId, shardCount])
+  @@index([mode, updatedAt])
 }
 
 model Tweet {
