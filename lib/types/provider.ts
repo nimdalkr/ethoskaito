@@ -164,6 +164,14 @@ export interface FxTwitterTweetResult {
   raw: Record<string, unknown>;
 }
 
+export interface XRecentTweetRef {
+  tweetId: string;
+  tweetUrl: string;
+  xUsername: string;
+  text: string;
+  createdAt: string | null;
+}
+
 export interface ProjectOutcomeSnapshotInput {
   symbol: string;
   from: string | number | Date;

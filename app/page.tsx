@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FilterBar } from "@/components/dashboard/filter-bar";
@@ -6,7 +7,7 @@ import { MetricCard } from "@/components/dashboard/metric-card";
 import { MentionFlow } from "@/components/project/mention-flow";
 import { ProjectDetailPanel } from "@/components/project/project-detail-panel";
 import { ProjectHeatmap } from "@/components/project/project-heatmap";
-import { ProjectRankTable } from "@/components/project/project-rank-table";
+import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
 import { UserSummaryList } from "@/components/user/user-summary-list";
 import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { getHomePageModel } from "@/lib/data/home";
@@ -21,38 +22,107 @@ export default async function Page() {
   const topTierWeight = model.tierRollups
     .filter((row) => row.tier === "T4")
     .reduce((sum, row) => sum + row.weightedMentions, 0);
+  const topProject = [...model.projects]
+    .map((project) => ({
+      project,
+      weightedMentions: model.tierRollups
+        .filter((row) => row.projectId === project.id)
+        .reduce((sum, row) => sum + row.weightedMentions, 0)
+    }))
+    .sort((left, right) => right.weightedMentions - left.weightedMentions)[0];
 
   return (
     <DashboardShell
       header={
-        <div className="stack-4">
-          <div className="header-row">
-            <div className="hero-block stack-3">
-              <Badge tone="accent">Ethos x FixTweet intelligence</Badge>
-              <h1 className="hero-title">Tier-aware project flow for alpha discovery and reputation proof.</h1>
-              <p className="hero-copy">
-                Track which trust tier sees a project first, how that signal spreads, and whether the market later validates it.
+        <section className="hero-surface">
+          <video
+            className="hero-video"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260217_030345_246c0224-10a4-422c-b324-070b7c0eceda.mp4"
+          />
+          <div className="hero-overlay" />
+          <div className="hero-gradient" />
+          <div className="hero-content">
+            <div className="hero-nav">
+              <div className="hero-brand-row">
+                <div className="hero-brand">ETHOSKAITO</div>
+                <nav className="hero-nav-links" aria-label="Primary">
+                  <a href="#mindshare-board">Mindshare</a>
+                  <a href="#signal-grid">Signal Grid</a>
+                  <a href="#project-lab">Project Lab</a>
+                  <a href="#first-movers">First Movers</a>
+                </nav>
+              </div>
+              <Button variant="secondary" className="hero-pill-button">
+                Collector Live
+              </Button>
+            </div>
+
+            <div className="hero-copy-stack">
+              <Badge tone="neutral" className="hero-badge">
+                <span className="hero-badge-dot" />
+                Early access available from <strong>May 1, 2026</strong>
+              </Badge>
+              <h1 className="hero-title hero-title-gradient">Web3 signal at the speed of conviction.</h1>
+              <p className="hero-copy hero-copy-wide">
+                Ethos reputation, FxTwitter expansion, and project-level flow analytics in one board. See which tier spotted a
+                project first, how attention spread, and whether the thesis actually held up.
               </p>
+              <div className="hero-action-row">
+                <Button className="hero-primary-button">Open Live Dashboard</Button>
+                <Button variant="secondary" className="hero-secondary-button">
+                  {getTrustTierLabel("T4")} monitors active
+                </Button>
+              </div>
+            </div>
+
+            <div className="hero-strip">
+              <div className="hero-strip-card">
+                <span>Top live project</span>
+                <strong>{topProject?.project.name ?? "No project yet"}</strong>
+              </div>
+              <div className="hero-strip-card">
+                <span>Weighted mentions</span>
+                <strong>{totalWeightedMentions}</strong>
+              </div>
+              <div className="hero-strip-card">
+                <span>First mention captures</span>
+                <strong>{firstMentions.length}</strong>
+              </div>
+              <div className="hero-strip-card">
+                <span>Validated outcomes</span>
+                <strong>
+                  {validatedProjects} / {model.outcomes.length}
+                </strong>
+              </div>
             </div>
           </div>
-          <FilterBar />
-        </div>
+        </section>
       }
     >
-      <section className="metric-grid">
-        <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
-        <MetricCard label="Signal authors" value={model.users.length} delta="Ranked by trust composite" />
-        <MetricCard label="Mentions ingested" value={model.mentions.length} delta="First tracked calls retained" />
-        <MetricCard label="Weighted mentions" value={totalWeightedMentions} delta="Tier-weighted signal volume" />
+      <section className="dashboard-intro stack-4">
+        <FilterBar />
+        <div className="metric-grid">
+          <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
+          <MetricCard label="Signal authors" value={model.users.length} delta="Ranked by trust composite" />
+          <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh tweets expanded by FxTwitter" />
+          <MetricCard label="Weighted mentions" value={totalWeightedMentions} delta="Tier-weighted signal volume" />
+        </div>
       </section>
 
-      <section className="dual-grid dual-grid-ratio">
+      <section id="mindshare-board" className="dual-grid dual-grid-ratio">
         <Card variant="surface">
-          <CardHeader>
-            <CardTitle>Tier x project heatmap</CardTitle>
+          <CardHeader className="card-header-inline">
+            <CardTitle>Mindshare board</CardTitle>
+            <Badge tone="accent">Top live projects</Badge>
           </CardHeader>
           <CardContent>
-            <ProjectHeatmap projects={model.projects} tierRollups={model.tierRollups} />
+            <ProjectMindshareBoard projects={model.projects} outcomes={model.outcomes} tierRollups={model.tierRollups} />
           </CardContent>
         </Card>
         <Card variant="surface">
@@ -83,20 +153,43 @@ export default async function Page() {
         </Card>
       </section>
 
-      <section className="dual-grid dual-grid-ratio-alt">
+      <section id="signal-grid" className="dual-grid dual-grid-ratio-alt">
         <Card variant="surface">
           <CardHeader className="card-header-inline">
-            <CardTitle>Project ranking</CardTitle>
-            <Badge tone="neutral">weighted by tier</Badge>
+            <CardTitle>Tier x project heatmap</CardTitle>
+            <Badge tone="neutral">Trust-weighted grid</Badge>
           </CardHeader>
           <CardContent>
-            <ProjectRankTable projects={model.projects} outcomes={model.outcomes} tierRollups={model.tierRollups} />
+            <ProjectHeatmap projects={model.projects} tierRollups={model.tierRollups} />
           </CardContent>
         </Card>
-        <ProjectDetailPanel projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
+        <Card variant="surface">
+          <CardHeader>
+            <CardTitle>Signal notes</CardTitle>
+          </CardHeader>
+          <CardContent className="stack-3 muted-copy">
+            <p>The board takes the treemap reading pattern from the reference image and maps it to weighted project mindshare.</p>
+            <p>Green tiles indicate stronger validation or neutral-positive posture, while red tiles surface projects that were mentioned but not yet proven.</p>
+            <p>Use the heatmap to see which trust layer accumulated attention behind each project after the initial mention.</p>
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="dual-grid dual-grid-even">
+      <section id="project-lab" className="dual-grid dual-grid-ratio-alt">
+        <ProjectDetailPanel projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
+        <Card variant="surface">
+          <CardHeader>
+            <CardTitle>Operating notes</CardTitle>
+          </CardHeader>
+          <CardContent className="stack-3 muted-copy">
+            <p>The dashboard now reads from the local database models rather than mock arrays.</p>
+            <p>If the board looks sparse, run the collector and refresh routes to ingest newer tweets and outcome snapshots.</p>
+            <p>Outcome cells remain blank until a market mapping resolves to a price source symbol.</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section id="first-movers" className="dual-grid dual-grid-even">
         <Card variant="surface">
           <CardHeader>
             <CardTitle>First movers</CardTitle>
@@ -107,12 +200,21 @@ export default async function Page() {
         </Card>
         <Card variant="surface">
           <CardHeader>
-            <CardTitle>Operating notes</CardTitle>
+            <CardTitle>Validation pressure</CardTitle>
           </CardHeader>
-          <CardContent className="stack-3 muted-copy">
-            <p>The dashboard now reads from the local database models rather than mock arrays.</p>
-            <p>If the grid is empty, run the sync route and ingest at least one tracked tweet payload.</p>
-            <p>Outcome cells remain blank until a market mapping resolves to a price source symbol.</p>
+          <CardContent className="stack-3">
+            <div className="panel-line">
+              <span>Tracked accounts</span>
+              <strong>{model.users.length}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Current first-call density</span>
+              <strong>{model.projects.length > 0 ? `${Math.round((firstMentions.length / model.projects.length) * 100)}%` : "0%"}</strong>
+            </div>
+            <div className="panel-line">
+              <span>Collector mode</span>
+              <strong>X guest + FxTwitter</strong>
+            </div>
           </CardContent>
         </Card>
       </section>
