@@ -1,8 +1,7 @@
 import { Fragment } from "react";
 import type { CSSProperties } from "react";
+import { getTrustTierLabel, TRUST_TIER_ORDER } from "@/lib/analytics/tier";
 import type { ProjectSnapshot, TierRollup } from "@/lib/types/domain";
-
-const tiers = ["T4", "T3", "T2", "T1", "T0"] as const;
 
 export function ProjectHeatmap({
   projects,
@@ -14,13 +13,13 @@ export function ProjectHeatmap({
   return (
     <div className="heatmap-grid">
       <div className="heatmap-head" />
-      {tiers.map((tier) => (
+      {TRUST_TIER_ORDER.map((tier) => (
         <div key={tier} className="heatmap-head">
-          {tier}
+          {getTrustTierLabel(tier)}
         </div>
       ))}
       {projects.map((project) => {
-        const rows = tiers.map((tier) => tierRollups.find((row) => row.projectId === project.id && row.tier === tier));
+        const rows = TRUST_TIER_ORDER.map((tier) => tierRollups.find((row) => row.projectId === project.id && row.tier === tier));
         return (
           <Fragment key={project.id}>
             <div key={`${project.id}-name`} className="heatmap-project">
@@ -31,7 +30,7 @@ export function ProjectHeatmap({
               const intensity = row ? Math.min(1, row.weightedMentions / 120) : 0.05;
               return (
                 <div
-                  key={`${project.id}-${tiers[index]}`}
+                  key={`${project.id}-${TRUST_TIER_ORDER[index]}`}
                   className="heatmap-cell"
                   style={{ "--cell-intensity": intensity } as CSSProperties}
                 >

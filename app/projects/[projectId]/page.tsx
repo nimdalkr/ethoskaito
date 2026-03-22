@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProjectDetail, getProjectFlow } from "@/lib/data/dashboard";
@@ -73,7 +74,7 @@ export default async function ProjectPage({ params }: { params: { projectId: str
                   flow.edges.map((edge) => (
                     <div key={`${edge.source}-${edge.target}`} className="panel-line">
                       <span>
-                        {edge.source} to {edge.target}
+                        {getTrustTierLabel(edge.source as any)} to {getTrustTierLabel(edge.target as any)}
                       </span>
                       <strong>{edge.delayHours}h</strong>
                     </div>
@@ -117,7 +118,7 @@ export default async function ProjectPage({ params }: { params: { projectId: str
                         <strong>{mention.tweet.authorName}</strong>
                         <div className="muted-text">@{mention.tweet.xUsername}</div>
                       </div>
-                      <div>{mention.authorTier}</div>
+                      <div>{getTrustTierLabel(mention.authorTier as any)}</div>
                       <div>{mention.weight}</div>
                       <div>
                         <a href={mention.tweet.url} target="_blank" rel="noreferrer">

@@ -2,6 +2,15 @@ import type { EthosLevel, EthosStats, TrustTier } from "@/lib/types/domain";
 import { clamp } from "@/lib/utils";
 
 const SCORE_MAX = 2800;
+export const TRUST_TIER_ORDER: TrustTier[] = ["T4", "T3", "T2", "T1", "T0"];
+
+const TRUST_TIER_LABELS: Record<TrustTier, string> = {
+  T0: "Bronze",
+  T1: "Gold",
+  T2: "Platinum",
+  T3: "Diamond",
+  T4: "Challenger"
+};
 
 export function getTrustTier(trustComposite: number): TrustTier {
   if (trustComposite >= 80) return "T4";
@@ -9,6 +18,10 @@ export function getTrustTier(trustComposite: number): TrustTier {
   if (trustComposite >= 40) return "T2";
   if (trustComposite >= 20) return "T1";
   return "T0";
+}
+
+export function getTrustTierLabel(tier: TrustTier) {
+  return TRUST_TIER_LABELS[tier];
 }
 
 export function getTierWeight(tier: TrustTier) {

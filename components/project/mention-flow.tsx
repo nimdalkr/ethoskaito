@@ -1,3 +1,4 @@
+import { getTrustTierLabel } from "@/lib/analytics/tier";
 import type { EthosUserSnapshot, ProjectMention, ProjectSnapshot } from "@/lib/types/domain";
 
 export function MentionFlow({
@@ -18,7 +19,7 @@ export function MentionFlow({
           <div key={mention.tweetId} className="mention-flow-item">
             <div>
               <strong>{user?.displayName ?? mention.authorUserkey}</strong>
-              <div className="muted-text">{user?.trustTier ?? mention.authorTier}</div>
+              <div className="muted-text">{getTrustTierLabel(user?.trustTier ?? mention.authorTier)}</div>
             </div>
             <div className="mention-flow-arrow">→</div>
             <div>

@@ -1,3 +1,4 @@
+import { getTrustTierLabel } from "@/lib/analytics/tier";
 import type { EthosUserSnapshot, ProjectMention } from "@/lib/types/domain";
 
 export function UserSummaryList({
@@ -17,7 +18,7 @@ export function UserSummaryList({
             <div className="user-meta">
               <strong>{user.displayName}</strong>
               <span>
-                {user.trustTier} · score {user.score.toFixed(0)}
+                {getTrustTierLabel(user.trustTier)} · score {user.score.toFixed(0)}
               </span>
             </div>
             <div className="user-badge">{leadMentions} first calls</div>

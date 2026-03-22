@@ -9,6 +9,7 @@ import { ProjectDetailPanel } from "@/components/project/project-detail-panel";
 import { ProjectHeatmap } from "@/components/project/project-heatmap";
 import { ProjectRankTable } from "@/components/project/project-rank-table";
 import { UserSummaryList } from "@/components/user/user-summary-list";
+import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { getHomePageModel } from "@/lib/data/home";
 
 export const dynamic = "force-dynamic";
@@ -71,7 +72,9 @@ export default async function Page() {
               </div>
               <div className="panel-line">
                 <span>Top tier weight share</span>
-                <strong>{totalWeightedMentions > 0 ? `${Math.round((topTierWeight / totalWeightedMentions) * 100)}%` : "0%"}</strong>
+                <strong>
+                  {getTrustTierLabel("T4")} {totalWeightedMentions > 0 ? `${Math.round((topTierWeight / totalWeightedMentions) * 100)}%` : "0%"}
+                </strong>
               </div>
               <div className="panel-line">
                 <span>Positive outcome match</span>

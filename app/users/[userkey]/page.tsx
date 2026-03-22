@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getUserDetail } from "@/lib/data/dashboard";
@@ -38,7 +39,7 @@ export default async function UserPage({ params }: { params: { userkey: string }
                 <CardTitle>Trust tier</CardTitle>
               </CardHeader>
               <CardContent>
-                <strong>{user.trustTier}</strong>
+                <strong>{getTrustTierLabel(user.trustTier as any)}</strong>
               </CardContent>
             </Card>
             <Card variant="surface">

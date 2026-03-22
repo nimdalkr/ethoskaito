@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeTrustComposite, getTierWeight, getTrustTier } from "@/lib/analytics/tier";
+import { computeTrustComposite, getTierWeight, getTrustTier, getTrustTierLabel } from "@/lib/analytics/tier";
 
 describe("tier analytics", () => {
   it("assigns the correct tier bucket", () => {
@@ -16,6 +16,14 @@ describe("tier analytics", () => {
     expect(getTierWeight("T2")).toBe(4);
     expect(getTierWeight("T3")).toBe(7);
     expect(getTierWeight("T4")).toBe(10);
+  });
+
+  it("maps buckets to LoL-style labels", () => {
+    expect(getTrustTierLabel("T0")).toBe("Bronze");
+    expect(getTrustTierLabel("T1")).toBe("Gold");
+    expect(getTrustTierLabel("T2")).toBe("Platinum");
+    expect(getTrustTierLabel("T3")).toBe("Diamond");
+    expect(getTrustTierLabel("T4")).toBe("Challenger");
   });
 
   it("computes a higher composite for stronger profiles", () => {
