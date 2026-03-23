@@ -17,17 +17,22 @@ type WindowMetrics = {
   deltaRelative: number;
 };
 
+type Sentiment = "positive" | "negative" | "neutral";
+
 type RankedEntry = {
   project: ProjectSnapshot;
   currentWeight: number;
+  mentionCount: number;
   share: number;
   selectedDeltaAbsolute: number;
   selectedDeltaRelative: number;
+  delta24hRelative: number;
   highTierShare: number;
+  sentiment: Sentiment;
+  rank: number;
   authors: Set<string>;
-  sparkline: number[];
+  trend: number[];
   metricsByWindow: Record<WindowDays, WindowMetrics>;
-  isOthers?: boolean;
 };
 
 type TreemapRect<T> = {
@@ -54,7 +59,8 @@ const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: Trus
 ];
 
 const WINDOW_DAY_VALUES: WindowDays[] = [1, 7, 30, 90];
-const SPARKLINE_BINS = 18;
+const SPARKLINE_BINS = 24;
+const MAX_VISIBLE_ITEMS = 50;
 
 function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
@@ -74,55 +80,95 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
     return [] as TreemapRect<T>[];
   }
 
-  const layout = (
-    input: Array<{ item: T; value: number }>,
-    rect: { x: number; y: number; width: number; height: number }
-  ): TreemapRect<T>[] => {
-    if (input.length === 0 || rect.width <= 0 || rect.height <= 0) {
-      return [];
+  const worstAspectRatio = (row: Array<{ item: T; area: number }>, shortSide: number) => {
+    if (row.length === 0 || shortSide <= 0) {
+      return Number.POSITIVE_INFINITY;
     }
 
-    if (input.length === 1) {
-      return [{ item: input[0].item, x: rect.x, y: rect.y, width: rect.width, height: rect.height }];
-    }
+    const totalArea = row.reduce((sum, item) => sum + item.area, 0);
+    const maxArea = Math.max(...row.map((item) => item.area));
+    const minArea = Math.min(...row.map((item) => item.area));
 
-    const totalValue = sumValues(input);
-    let leftValue = 0;
-    let splitIndex = 1;
-
-    while (splitIndex < input.length) {
-      const nextValue = leftValue + input[splitIndex - 1].value;
-      if (Math.abs(totalValue / 2 - nextValue) > Math.abs(totalValue / 2 - leftValue) && splitIndex > 1) {
-        break;
-      }
-
-      leftValue = nextValue;
-      splitIndex += 1;
-    }
-
-    splitIndex = Math.min(Math.max(splitIndex - 1, 1), input.length - 1);
-    leftValue = sumValues(input.slice(0, splitIndex));
-
-    const leftItems = input.slice(0, splitIndex);
-    const rightItems = input.slice(splitIndex);
-    const leftRatio = leftValue / totalValue;
-
-    if (rect.width >= rect.height) {
-      const leftWidth = rect.width * leftRatio;
-      return [
-        ...layout(leftItems, { x: rect.x, y: rect.y, width: leftWidth, height: rect.height }),
-        ...layout(rightItems, { x: rect.x + leftWidth, y: rect.y, width: rect.width - leftWidth, height: rect.height })
-      ];
-    }
-
-    const topHeight = rect.height * leftRatio;
-    return [
-      ...layout(leftItems, { x: rect.x, y: rect.y, width: rect.width, height: topHeight }),
-      ...layout(rightItems, { x: rect.x, y: rect.y + topHeight, width: rect.width, height: rect.height - topHeight })
-    ];
+    return Math.max((shortSide * shortSide * maxArea) / (totalArea * totalArea), (totalArea * totalArea) / (shortSide * shortSide * minArea));
   };
 
-  return layout(normalizedItems, { x: 0, y: 0, width, height });
+  const placeRow = (
+    row: Array<{ item: T; area: number }>,
+    rect: { x: number; y: number; width: number; height: number }
+  ): { placed: TreemapRect<T>[]; remaining: { x: number; y: number; width: number; height: number } } => {
+    const totalArea = row.reduce((sum, item) => sum + item.area, 0);
+
+    if (rect.width >= rect.height) {
+      const rowHeight = totalArea / rect.width;
+      let x = rect.x;
+      const placed = row.map((entry) => {
+        const tileWidth = entry.area / rowHeight;
+        const result = { item: entry.item, x, y: rect.y, width: tileWidth, height: rowHeight };
+        x += tileWidth;
+        return result;
+      });
+
+      return {
+        placed,
+        remaining: {
+          x: rect.x,
+          y: rect.y + rowHeight,
+          width: rect.width,
+          height: rect.height - rowHeight
+        }
+      };
+    }
+
+    const rowWidth = totalArea / rect.height;
+    let y = rect.y;
+    const placed = row.map((entry) => {
+      const tileHeight = entry.area / rowWidth;
+      const result = { item: entry.item, x: rect.x, y, width: rowWidth, height: tileHeight };
+      y += tileHeight;
+      return result;
+    });
+
+    return {
+      placed,
+      remaining: {
+        x: rect.x + rowWidth,
+        y: rect.y,
+        width: rect.width - rowWidth,
+        height: rect.height
+      }
+    };
+  };
+
+  const scale = (width * height) / total;
+  const itemsWithArea = normalizedItems.map((item) => ({ item: item.item, area: item.value * scale }));
+  const placed: TreemapRect<T>[] = [];
+  let row: Array<{ item: T; area: number }> = [];
+  let remaining = { x: 0, y: 0, width, height };
+
+  while (itemsWithArea.length > 0 && remaining.width > 0 && remaining.height > 0) {
+    const candidate = itemsWithArea[0];
+    const shortSide = Math.min(remaining.width, remaining.height);
+    const nextRatio = worstAspectRatio([...row, candidate], shortSide);
+    const currentRatio = worstAspectRatio(row, shortSide);
+
+    if (row.length === 0 || nextRatio <= currentRatio) {
+      row.push(candidate);
+      itemsWithArea.shift();
+      continue;
+    }
+
+    const result = placeRow(row, remaining);
+    placed.push(...result.placed);
+    remaining = result.remaining;
+    row = [];
+  }
+
+  if (row.length > 0 && remaining.width > 0 && remaining.height > 0) {
+    const result = placeRow(row, remaining);
+    placed.push(...result.placed);
+  }
+
+  return placed;
 }
 
 function getTreemapScaleClass(share: number) {
@@ -130,6 +176,49 @@ function getTreemapScaleClass(share: number) {
   if (share >= 7) return "mindshare-scale-large";
   if (share >= 3) return "mindshare-scale-medium";
   return "mindshare-scale-small";
+}
+
+function getSentiment(deltaRelative: number, currentWeight: number): Sentiment {
+  if (currentWeight <= 0) {
+    return "neutral";
+  }
+
+  if (deltaRelative >= 8) {
+    return "positive";
+  }
+
+  if (deltaRelative <= -8) {
+    return "negative";
+  }
+
+  return "neutral";
+}
+
+function buildSparklinePath(trend: number[]) {
+  if (trend.length === 0) {
+    return "";
+  }
+
+  const max = Math.max(...trend, 1);
+  return trend
+    .map((value, index) => {
+      const x = trend.length === 1 ? 50 : (index / (trend.length - 1)) * 100;
+      const y = 28 - (value / max) * 24 - 2;
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function formatDelta(value: number) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(Math.abs(value) >= 10 ? 0 : 1)}%`;
+}
+
+function getRankTone(rank: number) {
+  if (rank === 1) return "mindshare-rank-gold";
+  if (rank === 2) return "mindshare-rank-silver";
+  if (rank === 3) return "mindshare-rank-bronze";
+  return "mindshare-rank-default";
 }
 
 export function ProjectMindshareBoard({
@@ -143,6 +232,8 @@ export function ProjectMindshareBoard({
   const [tierFilter, setTierFilter] = useState<MindshareTierFilter>("all");
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [boardSize, setBoardSize] = useState({ width: 1000, height: 1000 });
+  const [hovered, setHovered] = useState<{ entry: RankedEntry; x: number; y: number } | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<RankedEntry | null>(null);
 
   useEffect(() => {
     const node = boardRef.current;
@@ -229,7 +320,7 @@ export function ProjectMindshareBoard({
       projectWeights.set(projectId, { current, previous });
     }
 
-    const ranked: RankedEntry[] = [...mentionBuckets.entries()]
+    const rankedBase = [...mentionBuckets.entries()]
       .map(([projectId, projectMentions]) => {
         const project = projectMap.get(projectId);
         const weights = projectWeights.get(projectId);
@@ -239,10 +330,12 @@ export function ProjectMindshareBoard({
 
         const authors = new Set<string>();
         let highTierWeight = 0;
+        let mentionCount = 0;
 
         for (const mention of projectMentions) {
           if (new Date(mention.mentionedAt).getTime() >= now - selectedWindow.days * 24 * 60 * 60 * 1000) {
             authors.add(mention.authorUserkey);
+            mentionCount += 1;
             if (mention.authorTier === "T4" || mention.authorTier === "T3") {
               highTierWeight += mention.weight;
             }
@@ -271,30 +364,34 @@ export function ProjectMindshareBoard({
         ) as Record<WindowDays, WindowMetrics>;
 
         const selectedMetrics = metricsByWindow[selectedWindow.days];
-        const sparkline = Array.from({ length: SPARKLINE_BINS }, () => 0);
-        const selectedWindowMs = selectedWindow.days * 24 * 60 * 60 * 1000;
-        const selectedStart = now - selectedWindowMs;
+        const trend = Array.from({ length: SPARKLINE_BINS }, () => 0);
+        const trendWindowMs = 24 * 60 * 60 * 1000;
+        const trendStart = now - trendWindowMs;
 
         for (const mention of projectMentions) {
           const mentionedAt = new Date(mention.mentionedAt).getTime();
-          if (mentionedAt < selectedStart) {
+          if (mentionedAt < trendStart) {
             continue;
           }
 
-          const progress = (mentionedAt - selectedStart) / selectedWindowMs;
+          const progress = (mentionedAt - trendStart) / trendWindowMs;
           const clamped = Math.max(0, Math.min(SPARKLINE_BINS - 1, Math.floor(progress * SPARKLINE_BINS)));
-          sparkline[clamped] += mention.weight;
+          trend[clamped] += mention.weight;
         }
 
         return {
           project,
           currentWeight: selectedMetrics.currentWeight,
+          mentionCount,
           share: selectedMetrics.share,
           selectedDeltaAbsolute: selectedMetrics.deltaAbsolute,
           selectedDeltaRelative: selectedMetrics.deltaRelative,
+          delta24hRelative: metricsByWindow[1].deltaRelative,
           highTierShare: selectedMetrics.currentWeight > 0 ? (highTierWeight / selectedMetrics.currentWeight) * 100 : 0,
+          sentiment: getSentiment(metricsByWindow[1].deltaRelative, selectedMetrics.currentWeight),
+          rank: 0,
           authors,
-          sparkline,
+          trend,
           metricsByWindow
         };
       })
@@ -307,6 +404,11 @@ export function ProjectMindshareBoard({
 
         return right.authors.size - left.authors.size;
       });
+
+    const ranked: RankedEntry[] = rankedBase.map((entry, index) => ({
+      ...entry,
+      rank: index + 1
+    }));
 
     const totalWeighted = ranked.reduce((sum, item) => sum + item.currentWeight, 0);
     const totalAuthors = ranked.reduce((sum, item) => sum + item.authors.size, 0);
@@ -321,10 +423,10 @@ export function ProjectMindshareBoard({
     };
   }, [mentions, projects, selectedTierFilter.tiers, selectedWindow.days]);
 
-  const topTwenty = board.ranked.slice(0, 20);
+  const visibleEntries = board.ranked.slice(0, MAX_VISIBLE_ITEMS);
   const treemap = useMemo(
-    () => createTreemapLayout(topTwenty.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
-    [boardSize.height, boardSize.width, topTwenty]
+    () => createTreemapLayout(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
+    [boardSize.height, boardSize.width, visibleEntries]
   );
 
   if (board.ranked.length === 0) {
@@ -391,10 +493,10 @@ export function ProjectMindshareBoard({
 
       <div ref={boardRef} className="mindshare-board">
         {treemap.map(({ item: entry, x, y, width, height }) => {
-          const momentumValue = entry.selectedDeltaRelative;
-          const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-          const compact = width < 16 || height < 14;
-          const tiny = width < 11 || height < 10;
+          const tone =
+            entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
+          const compact = width < 180 || height < 130;
+          const tiny = width < 132 || height < 102;
 
           return (
             <div
@@ -406,8 +508,11 @@ export function ProjectMindshareBoard({
                 width: `${width}px`,
                 height: `${height}px`
               }}
+              onMouseMove={(event) => setHovered({ entry, x: event.clientX + 14, y: event.clientY + 14 })}
+              onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
+              onClick={() => setSelectedEntry(entry)}
             >
-              <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`}>
+              <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}`}>
                 <div className="mindshare-meta">
                   <div className="mindshare-title-row">
                     <div className="mindshare-dot" />
@@ -415,13 +520,70 @@ export function ProjectMindshareBoard({
                   </div>
                 </div>
                 <div className="mindshare-share">{formatShare(entry.share)}</div>
-                {!compact ? <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div> : null}
-                {!tiny ? <div className="mindshare-footer-fill" aria-hidden="true" /> : null}
+                <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>#{entry.rank}</div>
+                {!tiny ? (
+                  <div className="mindshare-sparkline" aria-hidden="true">
+                    <svg viewBox="0 0 100 28" preserveAspectRatio="none">
+                      <path className="mindshare-sparkline-path" d={buildSparklinePath(entry.trend)} />
+                    </svg>
+                  </div>
+                ) : null}
+                {!compact ? <div className="mindshare-subtle">{Math.round(entry.highTierShare)}% high-tier</div> : null}
               </article>
             </div>
           );
         })}
       </div>
+
+      {hovered ? (
+        <div className="mindshare-tooltip" style={{ left: hovered.x, top: hovered.y }}>
+          <strong>{hovered.entry.project.name}</strong>
+          <span>{formatShare(hovered.entry.share)} mindshare</span>
+          <span>{formatDelta(hovered.entry.delta24hRelative)} in 24H</span>
+          <span>{hovered.entry.mentionCount} mentions</span>
+        </div>
+      ) : null}
+
+      {selectedEntry ? (
+        <div className="mindshare-modal-backdrop" onClick={() => setSelectedEntry(null)}>
+          <div className="mindshare-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="mindshare-modal-header">
+              <div className="stack-3">
+                <span className={`mindshare-modal-rank ${getRankTone(selectedEntry.rank)}`}>Rank #{selectedEntry.rank}</span>
+                <strong>{selectedEntry.project.name}</strong>
+              </div>
+              <button type="button" className="mindshare-modal-close" onClick={() => setSelectedEntry(null)}>
+                Close
+              </button>
+            </div>
+
+            <div className="mindshare-modal-grid">
+              <div className="mindshare-modal-stat">
+                <span>Mindshare</span>
+                <strong>{formatShare(selectedEntry.share)}</strong>
+              </div>
+              <div className="mindshare-modal-stat">
+                <span>24H change</span>
+                <strong>{formatDelta(selectedEntry.delta24hRelative)}</strong>
+              </div>
+              <div className="mindshare-modal-stat">
+                <span>Mentions</span>
+                <strong>{selectedEntry.mentionCount}</strong>
+              </div>
+              <div className="mindshare-modal-stat">
+                <span>High-tier share</span>
+                <strong>{Math.round(selectedEntry.highTierShare)}%</strong>
+              </div>
+            </div>
+
+            <div className="mindshare-modal-chart">
+              <svg viewBox="0 0 100 28" preserveAspectRatio="none">
+                <path className="mindshare-sparkline-path" d={buildSparklinePath(selectedEntry.trend)} />
+              </svg>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

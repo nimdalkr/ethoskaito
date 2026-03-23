@@ -667,6 +667,7 @@ code {
 .mindshare-tile-shell {
   position: absolute;
   padding: 2px;
+  transition: left 240ms ease, top 240ms ease, width 240ms ease, height 240ms ease;
 }
 
 .mindshare-tile {
@@ -682,6 +683,13 @@ code {
   overflow: hidden;
   gap: 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.mindshare-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .mindshare-tile::before {
@@ -762,20 +770,33 @@ code {
   font-weight: 700;
 }
 
-.mindshare-footer-fill {
+.mindshare-sparkline {
   margin-top: auto;
-  height: 28%;
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.12) 0,
-      rgba(255, 255, 255, 0.12) 8px,
-      rgba(255, 255, 255, 0.02) 8px,
-      rgba(255, 255, 255, 0.02) 18px
-    );
-  opacity: 0.45;
+  height: 32%;
+  min-height: 42px;
+  position: relative;
+  z-index: 1;
+}
+
+.mindshare-sparkline svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mindshare-sparkline-path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mindshare-subtle {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .mindshare-scale-hero .mindshare-share {
@@ -796,6 +817,149 @@ code {
 
 .mindshare-scale-small .mindshare-title-row strong {
   font-size: clamp(0.84rem, 1.1vw, 1rem);
+}
+
+.mindshare-rank-gold {
+  border-color: rgba(245, 196, 76, 0.98);
+}
+
+.mindshare-rank-silver {
+  border-color: rgba(208, 216, 232, 0.96);
+}
+
+.mindshare-rank-bronze {
+  border-color: rgba(205, 132, 84, 0.96);
+}
+
+.mindshare-rank-gold.mindshare-corner,
+.mindshare-rank-silver.mindshare-corner,
+.mindshare-rank-bronze.mindshare-corner,
+.mindshare-rank-default.mindshare-corner {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.mindshare-rank-gold.mindshare-corner {
+  background: rgba(255, 227, 150, 0.98);
+  color: #6f4a00;
+}
+
+.mindshare-rank-silver.mindshare-corner {
+  background: rgba(235, 240, 248, 0.96);
+  color: #4a5568;
+}
+
+.mindshare-rank-bronze.mindshare-corner {
+  background: rgba(231, 187, 155, 0.96);
+  color: #6d3f1c;
+}
+
+.mindshare-rank-default.mindshare-corner {
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2937;
+}
+
+.mindshare-tooltip {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 6px;
+  min-width: 184px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(11, 15, 20, 0.94);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+}
+
+.mindshare-tooltip strong,
+.mindshare-modal strong {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.mindshare-tooltip span,
+.mindshare-modal span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.84rem;
+}
+
+.mindshare-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 4, 6, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.mindshare-modal {
+  width: min(720px, 100%);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 15, 20, 0.96);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.44);
+  padding: 24px;
+  display: grid;
+  gap: 22px;
+}
+
+.mindshare-modal-header,
+.mindshare-modal-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.mindshare-modal-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.mindshare-modal-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mindshare-modal-stat {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  gap: 6px;
+}
+
+.mindshare-modal-chart {
+  height: 160px;
+  border-radius: 20px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+}
+
+.mindshare-modal-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mindshare-modal-rank {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mindshare-modal-close {
+  border: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
 }
 
 .mindshare-tier-strip {
@@ -1024,6 +1188,10 @@ code {
     aspect-ratio: 5 / 4;
     min-height: 720px;
   }
+
+  .mindshare-modal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
@@ -1080,5 +1248,10 @@ code {
   .mindshare-board {
     aspect-ratio: 4 / 5;
     min-height: 760px;
+  }
+
+  .mindshare-modal-header,
+  .mindshare-modal-grid {
+    grid-template-columns: 1fr;
   }
 }
