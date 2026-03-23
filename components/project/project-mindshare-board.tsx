@@ -276,13 +276,13 @@ function getTreemapScaleClass(share: number) {
   return "mindshare-scale-small";
 }
 
-function getTileSpan(share: number) {
-  if (share >= 20) return { cols: 6, rows: 4 };
-  if (share >= 10) return { cols: 4, rows: 4 };
-  if (share >= 6) return { cols: 4, rows: 3 };
-  if (share >= 3) return { cols: 3, rows: 3 };
-  if (share >= 2) return { cols: 3, rows: 2 };
-  return { cols: 2, rows: 2 };
+function getTileSpan(share: number, maxShare: number) {
+  const normalized = Math.max(share / Math.max(maxShare, 1), 0.12);
+  const targetArea = Math.max(4, Math.min(36, Math.round(normalized * 36)));
+  const cols = Math.max(2, Math.min(6, Math.round(Math.sqrt(targetArea))));
+  const rows = Math.max(2, Math.min(6, Math.ceil(targetArea / cols)));
+
+  return { cols, rows };
 }
 
 export function ProjectMindshareBoard({
@@ -452,6 +452,7 @@ export function ProjectMindshareBoard({
 
   const topTwenty = board.ranked.slice(0, 20);
   const treemap = useMemo(() => buildDisplayTreemap(topTwenty, selectedWindow.days), [selectedWindow.days, topTwenty]);
+  const maxShare = treemap.reduce((max, rect) => Math.max(max, rect.item.share), 0);
 
   if (board.ranked.length === 0) {
     return (
@@ -519,7 +520,7 @@ export function ProjectMindshareBoard({
         {treemap.map(({ item: entry }) => {
           const momentumValue = entry.selectedDeltaRelative;
           const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-          const span = getTileSpan(entry.share);
+          const span = getTileSpan(entry.share, maxShare);
 
           return (
             <article
