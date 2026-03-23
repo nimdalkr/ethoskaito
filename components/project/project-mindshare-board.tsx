@@ -482,6 +482,18 @@ function createOthersEntry(entries: RankedEntry[], rank: number): RankedEntry | 
   };
 }
 
+function getLayoutValue(entries: RankedEntry[], entry: RankedEntry) {
+  if (!entry.isOthers) {
+    return entry.share;
+  }
+
+  const regular = entries.filter((item) => !item.isOthers);
+  const anchorA = regular[4]?.share ?? regular[regular.length - 1]?.share ?? entry.share;
+  const anchorB = regular[5]?.share ?? anchorA;
+  const cap = Math.max(anchorA * 1.55, anchorB * 1.8, 6.2);
+  return Math.min(entry.share, cap);
+}
+
 export function ProjectMindshareBoard({
   projects,
   mentions
@@ -696,7 +708,10 @@ export function ProjectMindshareBoard({
     const regular = visibleEntries.filter((entry) => !entry.isOthers);
     return [...regular.slice(0, 12), others, ...regular.slice(12)];
   }, [visibleEntries]);
-  const layout = useMemo(() => createMindshareMosaic(arrangedEntries.map((entry) => ({ item: entry, value: entry.share })), boardWidth), [arrangedEntries, boardWidth]);
+  const layout = useMemo(
+    () => createMindshareMosaic(arrangedEntries.map((entry) => ({ item: entry, value: getLayoutValue(arrangedEntries, entry) })), boardWidth),
+    [arrangedEntries, boardWidth]
+  );
   const boardHeight = Math.max(layout.height, boardWidth >= 1240 ? 640 : boardWidth >= 980 ? 700 : boardWidth >= 720 ? 820 : 920);
 
   if (board.ranked.length === 0) {
