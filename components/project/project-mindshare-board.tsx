@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import type { ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
 
 type MindshareWindow = "1d" | "7d" | "30d" | "90d";
-type MindshareMode = "absolute" | "relative";
 type MindshareTierFilter = "all" | "high" | "mid" | "t1" | "t0";
 type WindowDays = 1 | 7 | 30 | 90;
 
@@ -59,23 +58,6 @@ const SPARKLINE_BINS = 18;
 
 function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
-}
-
-function formatDelta(value: number, mode: MindshareMode) {
-  if (mode === "relative") {
-    if (!Number.isFinite(value)) {
-      return "+100%";
-    }
-
-    return `${value > 0 ? "+" : ""}${Math.round(value)}%`;
-  }
-
-  const bps = Math.round(value * 100);
-  return `${bps > 0 ? "+" : ""}${bps}bps`;
-}
-
-function getMetricDelta(metrics: WindowMetrics, mode: MindshareMode) {
-  return mode === "absolute" ? metrics.deltaAbsolute : metrics.deltaRelative;
 }
 
 function sumAreas<T>(items: Array<{ item: T; area: number }>) {
@@ -294,6 +276,15 @@ function getTreemapScaleClass(share: number) {
   return "mindshare-scale-small";
 }
 
+function getTileSpan(share: number) {
+  if (share >= 20) return { cols: 6, rows: 4 };
+  if (share >= 10) return { cols: 4, rows: 4 };
+  if (share >= 6) return { cols: 4, rows: 3 };
+  if (share >= 3) return { cols: 3, rows: 3 };
+  if (share >= 2) return { cols: 3, rows: 2 };
+  return { cols: 2, rows: 2 };
+}
+
 export function ProjectMindshareBoard({
   projects,
   mentions
@@ -302,7 +293,6 @@ export function ProjectMindshareBoard({
   mentions: ProjectMention[];
 }) {
   const [windowKey, setWindowKey] = useState<MindshareWindow>("90d");
-  const [mode, setMode] = useState<MindshareMode>("absolute");
   const [tierFilter, setTierFilter] = useState<MindshareTierFilter>("all");
 
   const selectedWindow = WINDOW_OPTIONS.find((option) => option.key === windowKey) ?? WINDOW_OPTIONS[3];
@@ -447,23 +437,6 @@ export function ProjectMindshareBoard({
         return right.authors.size - left.authors.size;
       });
 
-    const leaderboard = [...ranked].sort((left, right) => {
-      const leftDelta = mode === "absolute" ? left.selectedDeltaAbsolute : left.selectedDeltaRelative;
-      const rightDelta = mode === "absolute" ? right.selectedDeltaAbsolute : right.selectedDeltaRelative;
-
-      if (rightDelta !== leftDelta) {
-        return rightDelta - leftDelta;
-      }
-
-      return right.share - left.share;
-    });
-
-    const gainers = leaderboard.filter((entry) => getMetricDelta(entry.metricsByWindow[selectedWindow.days], mode) > 0).slice(0, 10);
-    const losers = [...leaderboard]
-      .filter((entry) => getMetricDelta(entry.metricsByWindow[selectedWindow.days], mode) < 0)
-      .reverse()
-      .slice(0, 10);
-
     const totalWeighted = ranked.reduce((sum, item) => sum + item.currentWeight, 0);
     const totalAuthors = ranked.reduce((sum, item) => sum + item.authors.size, 0);
     const highTierShare =
@@ -471,53 +444,14 @@ export function ProjectMindshareBoard({
 
     return {
       ranked,
-      gainers,
-      losers,
       totalWeighted,
       totalAuthors,
       highTierShare
     };
-  }, [mentions, mode, projects, selectedTierFilter.tiers, selectedWindow.days]);
+  }, [mentions, projects, selectedTierFilter.tiers, selectedWindow.days]);
 
   const topTwenty = board.ranked.slice(0, 20);
-  const primaryEntries = topTwenty.slice(0, 9);
-  const secondaryEntries = topTwenty.slice(9, 20);
-  const treemap = useMemo(() => buildDisplayTreemap(primaryEntries, selectedWindow.days), [primaryEntries, selectedWindow.days]);
-
-  const renderLeaderboard = (rows: RankedEntry[], tone: "positive" | "negative") => (
-    <div className="mindshare-leaderboard">
-      <div className="mindshare-leaderboard-head">
-        <span>Name</span>
-        <span>Current</span>
-        <span>1D</span>
-        <span>7D</span>
-        <span>30D</span>
-        <span>3M</span>
-      </div>
-      {rows.length > 0 ? (
-        rows.map((entry) => (
-          <div key={`${tone}-${entry.project.id}`} className="mindshare-leaderboard-row">
-            <strong>{entry.project.name}</strong>
-            <span>{formatShare(entry.share)}</span>
-            <span className={tone === "positive" ? "mindshare-delta-positive" : "mindshare-delta-negative"}>
-              {formatDelta(getMetricDelta(entry.metricsByWindow[1], mode), mode)}
-            </span>
-            <span className={tone === "positive" ? "mindshare-delta-positive" : "mindshare-delta-negative"}>
-              {formatDelta(getMetricDelta(entry.metricsByWindow[7], mode), mode)}
-            </span>
-            <span className={tone === "positive" ? "mindshare-delta-positive" : "mindshare-delta-negative"}>
-              {formatDelta(getMetricDelta(entry.metricsByWindow[30], mode), mode)}
-            </span>
-            <span className={tone === "positive" ? "mindshare-delta-positive" : "mindshare-delta-negative"}>
-              {formatDelta(getMetricDelta(entry.metricsByWindow[90], mode), mode)}
-            </span>
-          </div>
-        ))
-      ) : (
-        <div className="mindshare-side-empty">No rows yet.</div>
-      )}
-    </div>
-  );
+  const treemap = useMemo(() => buildDisplayTreemap(topTwenty, selectedWindow.days), [selectedWindow.days, topTwenty]);
 
   if (board.ranked.length === 0) {
     return (
@@ -560,35 +494,17 @@ export function ProjectMindshareBoard({
           ))}
         </div>
 
-        <div className="mindshare-control-cluster">
-          <div className="mindshare-mode-tabs">
+        <div className="mindshare-filter-tabs">
+          {TIER_FILTERS.map((option) => (
             <button
+              key={option.key}
               type="button"
-              className={mode === "absolute" ? "mindshare-mode-button mindshare-mode-button-active" : "mindshare-mode-button"}
-              onClick={() => setMode("absolute")}
+              className={option.key === tierFilter ? "mindshare-mode-button mindshare-mode-button-active" : "mindshare-mode-button"}
+              onClick={() => setTierFilter(option.key)}
             >
-              Absolute (bps)
+              {option.label}
             </button>
-            <button
-              type="button"
-              className={mode === "relative" ? "mindshare-mode-button mindshare-mode-button-active" : "mindshare-mode-button"}
-              onClick={() => setMode("relative")}
-            >
-              Relative (%)
-            </button>
-          </div>
-          <div className="mindshare-filter-tabs">
-            {TIER_FILTERS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                className={option.key === tierFilter ? "mindshare-mode-button mindshare-mode-button-active" : "mindshare-mode-button"}
-                onClick={() => setTierFilter(option.key)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
@@ -599,96 +515,39 @@ export function ProjectMindshareBoard({
         <strong>{Math.round(board.highTierShare)}% high-tier</strong>
       </div>
 
-      <div className="mindshare-arena">
-        <aside className="mindshare-sidebar">
-          <section className="mindshare-side-card">
-            <div className="mindshare-side-header">
-              <div>
-                <span>Top gainer</span>
-                <strong>{mode === "absolute" ? "Absolute (bps)" : "Relative (%)"}</strong>
-              </div>
-            </div>
-            {renderLeaderboard(board.gainers, "positive")}
-          </section>
+      <div className="mindshare-grid-board">
+        {treemap.map(({ item: entry }) => {
+          const momentumValue = entry.selectedDeltaRelative;
+          const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
+          const span = getTileSpan(entry.share);
 
-          <section className="mindshare-side-card">
-            <div className="mindshare-side-header">
-              <div>
-                <span>Top loser</span>
-                <strong>{mode === "absolute" ? "Absolute (bps)" : "Relative (%)"}</strong>
-              </div>
-            </div>
-            {renderLeaderboard(board.losers, "negative")}
-          </section>
-        </aside>
-
-        <div className="mindshare-board-split">
-          <div className="mindshare-primary-board">
-            {treemap.map(({ item: entry, x, y, width, height }) => {
-              const momentumValue = mode === "absolute" ? entry.selectedDeltaAbsolute : entry.selectedDeltaRelative;
-              const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-              const compact = width < 12 || height < 14;
-              const tiny = width < 9 || height < 11;
-
-              return (
-                <div
-                  key={entry.project.id}
-                  className="mindshare-tile-shell"
-                  style={{
-                    left: `${x}%`,
-                    top: `${y}%`,
-                    width: `${width}%`,
-                    height: `${height}%`
-                  }}
-                >
-                  <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`}>
-                    <div className="mindshare-meta">
-                      <div className="mindshare-title-row">
-                        <div className="mindshare-dot" />
-                        <strong>{entry.project.name}</strong>
-                      </div>
-                    </div>
-
-                    <div className="mindshare-share">{formatShare(entry.share)}</div>
-                    {!tiny ? (
-                      <div className="mindshare-sparkline" aria-hidden="true">
-                        {entry.sparkline.map((value, index) => {
-                          const max = Math.max(...entry.sparkline, 1);
-                          const heightPct = `${Math.max(8, (value / max) * 100)}%`;
-                          return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
-                        })}
-                      </div>
-                    ) : null}
-                    {!compact ? <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div> : null}
-                    {compact ? <div className="mindshare-footer-tag">{Math.round(entry.highTierShare)}% high-tier</div> : null}
-                  </article>
+          return (
+            <article
+              key={entry.project.id}
+              className={`mindshare-grid-tile ${tone} ${getTreemapScaleClass(entry.share)}`}
+              style={{
+                gridColumn: `span ${span.cols}`,
+                gridRow: `span ${span.rows}`
+              }}
+            >
+              <div className="mindshare-meta">
+                <div className="mindshare-title-row">
+                  <div className="mindshare-dot" />
+                  <strong>{entry.project.name}</strong>
                 </div>
-              );
-            })}
-          </div>
-
-          {secondaryEntries.length > 0 ? (
-            <div className="mindshare-secondary-grid">
-              {secondaryEntries.map((entry) => {
-                const momentumValue = mode === "absolute" ? entry.selectedDeltaAbsolute : entry.selectedDeltaRelative;
-                const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-
-                return (
-                  <article key={entry.project.id} className={`mindshare-mini-tile ${tone}`}>
-                    <div className="mindshare-mini-head">
-                      <div className="mindshare-title-row">
-                        <div className="mindshare-dot" />
-                        <strong>{entry.project.name}</strong>
-                      </div>
-                      <span className="mindshare-mini-tag">{Math.round(entry.highTierShare)}% high-tier</span>
-                    </div>
-                    <div className="mindshare-mini-share">{formatShare(entry.share)}</div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
+              </div>
+              <div className="mindshare-share">{formatShare(entry.share)}</div>
+              <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
+              <div className="mindshare-sparkline" aria-hidden="true">
+                {entry.sparkline.map((value, index) => {
+                  const max = Math.max(...entry.sparkline, 1);
+                  const heightPct = `${Math.max(8, (value / max) * 100)}%`;
+                  return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
+                })}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );
