@@ -60,7 +60,7 @@ const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: Trus
 
 const WINDOW_DAY_VALUES: WindowDays[] = [1, 7, 30, 90];
 const SPARKLINE_BINS = 24;
-const MAX_VISIBLE_ITEMS = 20;
+const MAX_VISIBLE_ITEMS = 15;
 
 function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
