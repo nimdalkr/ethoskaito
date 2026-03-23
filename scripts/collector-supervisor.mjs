@@ -10,6 +10,7 @@ const shardCount = Math.max(1, Number.parseInt(process.env.COLLECTOR_SHARDS ?? "
 const mainPauseMs = Math.max(5_000, Number.parseInt(process.env.COLLECTOR_MAIN_PAUSE_MS ?? "90000", 10) || 90000);
 const cyclePauseMs = Math.max(30_000, Number.parseInt(process.env.COLLECTOR_CYCLE_PAUSE_MS ?? "900000", 10) || 900000);
 const leaseSeconds = Math.max(60, Number.parseInt(process.env.COLLECTOR_LEASE_SECONDS ?? "300", 10) || 300);
+const failurePauseMs = Math.max(15_000, Number.parseInt(process.env.COLLECTOR_FAILURE_PAUSE_MS ?? "60000", 10) || 60000);
 const workerType = process.env.COLLECTOR_WORKER_TYPE ?? "collector-supervisor";
 const holderId = process.env.COLLECTOR_WORKER_ID ?? `worker-${randomUUID()}`;
 const runOnce = process.env.COLLECTOR_ONCE === "1";
@@ -153,16 +154,21 @@ async function runCycle() {
 
 try {
   do {
-    const acquired = await acquireLease();
-    if (!acquired) {
-      console.log(`Worker lease is held by another instance for ${workerType}`);
-      await sleep(Math.min(cyclePauseMs, leaseSeconds * 1000));
-      continue;
-    }
+    try {
+      const acquired = await acquireLease();
+      if (!acquired) {
+        console.log(`Worker lease is held by another instance for ${workerType}`);
+        await sleep(Math.min(cyclePauseMs, leaseSeconds * 1000));
+        continue;
+      }
 
-    await runCycle();
-    if (!runOnce) {
-      await sleep(cyclePauseMs);
+      await runCycle();
+      if (!runOnce) {
+        await sleep(cyclePauseMs);
+      }
+    } catch (error) {
+      console.error("Collector cycle failed", error);
+      await sleep(failurePauseMs);
     }
   } while (!runOnce);
 } catch (error) {
