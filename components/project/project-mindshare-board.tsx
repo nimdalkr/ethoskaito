@@ -190,43 +190,68 @@ function splitBalancedGroups<T>(items: Array<{ item: T; value: number }>, groupC
   return groups.filter((group) => group.length > 0);
 }
 
-function createNestedTreemap<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100, leaderCount = 4) {
-  if (items.length <= leaderCount + 1) {
+function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100, leaderCount = 4) {
+  if (items.length <= leaderCount) {
     return createTreemapLayout(items, width, height);
   }
 
   const leaders = items.slice(0, leaderCount);
   const tail = items.slice(leaderCount);
-  const tailGroups = splitBalancedGroups(tail, Math.min(3, Math.max(2, Math.ceil(tail.length / 4))));
-
-  const grouped = createTreemapLayout(
-    [
-      ...leaders,
-      ...tailGroups.map((group, index) => ({
-        item: ({ __tailGroup: index } as T),
-        value: sumValues(group)
-      }))
-    ],
-    width,
-    height
-  );
-
+  const total = sumValues(items);
+  const heroTotal = sumValues(leaders);
+  const tailTotal = Math.max(sumValues(tail), 0);
+  const heroHeight = height * (heroTotal / total);
+  const tailHeight = height - heroHeight;
   const flattened: TreemapRect<T>[] = [];
 
-  for (const rect of grouped) {
-    const tailGroupIndex = typeof rect.item === "object" && rect.item !== null && "__tailGroup" in rect.item ? Number(rect.item.__tailGroup) : null;
-    if (tailGroupIndex !== null) {
-      const nested = createTreemapLayout(tailGroups[tailGroupIndex], rect.width, rect.height).map((child) => ({
-        item: child.item,
-        x: rect.x + child.x,
-        y: rect.y + child.y,
-        width: child.width,
-        height: child.height
-      }));
-      flattened.push(...nested);
-    } else {
-      flattened.push(rect);
+  const heroRows = [leaders.slice(0, 2), leaders.slice(2, 4)].filter((row) => row.length > 0);
+  let currentY = 0;
+
+  for (const row of heroRows) {
+    const rowTotal = sumValues(row);
+    const rowHeight = heroHeight * (rowTotal / heroTotal);
+    let currentX = 0;
+
+    for (const entry of row) {
+      const tileWidth = width * (entry.value / rowTotal);
+      flattened.push({
+        item: entry.item,
+        x: currentX,
+        y: currentY,
+        width: tileWidth,
+        height: rowHeight
+      });
+      currentX += tileWidth;
     }
+
+    currentY += rowHeight;
+  }
+
+  if (tail.length === 0 || tailHeight <= 0 || tailTotal <= 0) {
+    return flattened;
+  }
+
+  const tailGroups = splitBalancedGroups(tail, Math.min(3, Math.max(2, Math.ceil(tail.length / 4))));
+  let currentX = 0;
+
+  for (const group of tailGroups) {
+    const groupTotal = sumValues(group);
+    const columnWidth = width * (groupTotal / tailTotal);
+    let columnY = heroHeight;
+
+    for (const entry of group) {
+      const tileHeight = tailHeight * (entry.value / groupTotal);
+      flattened.push({
+        item: entry.item,
+        x: currentX,
+        y: columnY,
+        width: columnWidth,
+        height: tileHeight
+      });
+      columnY += tileHeight;
+    }
+
+    currentX += columnWidth;
   }
 
   return flattened;
@@ -486,7 +511,7 @@ export function ProjectMindshareBoard({
 
   const visibleEntries = board.ranked.slice(0, MAX_VISIBLE_ITEMS);
   const treemap = useMemo(
-    () => createNestedTreemap(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
+    () => createMindshareMosaic(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
     [boardSize.height, boardSize.width, visibleEntries]
   );
 
