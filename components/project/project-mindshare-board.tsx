@@ -60,109 +60,69 @@ function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
 }
 
-function sumAreas<T>(items: Array<{ item: T; area: number }>) {
-  return items.reduce((sum, item) => sum + item.area, 0);
-}
-
-function worstAspectRatio<T>(row: Array<{ item: T; area: number }>, shortSide: number) {
-  if (row.length === 0 || shortSide <= 0) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  const total = sumAreas(row);
-  const max = Math.max(...row.map((item) => item.area));
-  const min = Math.min(...row.map((item) => item.area));
-
-  return Math.max((shortSide * shortSide * max) / (total * total), (total * total) / (shortSide * shortSide * min));
-}
-
-function layoutTreemapRow<T>(
-  row: Array<{ item: T; area: number }>,
-  rect: { x: number; y: number; width: number; height: number }
-): { placed: TreemapRect<T>[]; remaining: { x: number; y: number; width: number; height: number } } {
-  const total = sumAreas(row);
-
-  if (rect.width >= rect.height) {
-    const rowHeight = total / rect.width;
-    let x = rect.x;
-    const placed = row.map((entry) => {
-      const width = entry.area / rowHeight;
-      const next = { item: entry.item, x, y: rect.y, width, height: rowHeight };
-      x += width;
-      return next;
-    });
-
-    return {
-      placed,
-      remaining: {
-        x: rect.x,
-        y: rect.y + rowHeight,
-        width: rect.width,
-        height: rect.height - rowHeight
-      }
-    };
-  }
-
-  const rowWidth = total / rect.height;
-  let y = rect.y;
-  const placed = row.map((entry) => {
-    const height = entry.area / rowWidth;
-    const next = { item: entry.item, x: rect.x, y, width: rowWidth, height };
-    y += height;
-    return next;
-  });
-
-  return {
-    placed,
-    remaining: {
-      x: rect.x + rowWidth,
-      y: rect.y,
-      width: rect.width - rowWidth,
-      height: rect.height
-    }
-  };
+function sumValues<T>(items: Array<{ item: T; value: number }>) {
+  return items.reduce((sum, item) => sum + item.value, 0);
 }
 
 function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100) {
-  const total = items.reduce((sum, item) => sum + item.value, 0);
-  if (total <= 0) {
+  const normalizedItems = items
+    .filter((item) => item.value > 0)
+    .sort((left, right) => right.value - left.value);
+
+  const total = sumValues(normalizedItems);
+  if (total <= 0 || width <= 0 || height <= 0) {
     return [] as TreemapRect<T>[];
   }
 
-  const scale = (width * height) / total;
-  const remainingItems = items
-    .filter((item) => item.value > 0)
-    .sort((left, right) => right.value - left.value)
-    .map((item) => ({ item: item.item, area: item.value * scale }));
-
-  const placed: TreemapRect<T>[] = [];
-  let row: Array<{ item: T; area: number }> = [];
-  let rect = { x: 0, y: 0, width, height };
-
-  while (remainingItems.length > 0 && rect.width > 0 && rect.height > 0) {
-    const candidate = remainingItems[0];
-    const shortSide = Math.min(rect.width, rect.height);
-    const candidateRatio = worstAspectRatio([...row, candidate], shortSide);
-    const currentRatio = worstAspectRatio(row, shortSide);
-
-    if (row.length === 0 || candidateRatio <= currentRatio) {
-      row.push(candidate);
-      remainingItems.shift();
-      continue;
+  const layout = (
+    input: Array<{ item: T; value: number }>,
+    rect: { x: number; y: number; width: number; height: number }
+  ): TreemapRect<T>[] => {
+    if (input.length === 0 || rect.width <= 0 || rect.height <= 0) {
+      return [];
     }
 
-    const next = layoutTreemapRow(row, rect);
-    placed.push(...next.placed);
-    rect = next.remaining;
-    row = [];
-  }
+    if (input.length === 1) {
+      return [{ item: input[0].item, x: rect.x, y: rect.y, width: rect.width, height: rect.height }];
+    }
 
-  if (row.length > 0 && rect.width > 0 && rect.height > 0) {
-    const next = layoutTreemapRow(row, rect);
-    placed.push(...next.placed);
-  }
+    const totalValue = sumValues(input);
+    let leftValue = 0;
+    let splitIndex = 1;
 
-  return placed;
+    while (splitIndex < input.length) {
+      const nextValue = leftValue + input[splitIndex - 1].value;
+      if (Math.abs(totalValue / 2 - nextValue) > Math.abs(totalValue / 2 - leftValue) && splitIndex > 1) {
+        break;
+      }
+
+      leftValue = nextValue;
+      splitIndex += 1;
+    }
+
+    splitIndex = Math.min(Math.max(splitIndex - 1, 1), input.length - 1);
+    leftValue = sumValues(input.slice(0, splitIndex));
+
+    const leftItems = input.slice(0, splitIndex);
+    const rightItems = input.slice(splitIndex);
+    const leftRatio = leftValue / totalValue;
+
+    if (rect.width >= rect.height) {
+      const leftWidth = rect.width * leftRatio;
+      return [
+        ...layout(leftItems, { x: rect.x, y: rect.y, width: leftWidth, height: rect.height }),
+        ...layout(rightItems, { x: rect.x + leftWidth, y: rect.y, width: rect.width - leftWidth, height: rect.height })
+      ];
+    }
+
+    const topHeight = rect.height * leftRatio;
+    return [
+      ...layout(leftItems, { x: rect.x, y: rect.y, width: rect.width, height: topHeight }),
+      ...layout(rightItems, { x: rect.x, y: rect.y + topHeight, width: rect.width, height: rect.height - topHeight })
+    ];
+  };
+
+  return layout(normalizedItems, { x: 0, y: 0, width, height });
 }
 
 function getTreemapScaleClass(share: number) {

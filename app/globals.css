@@ -653,19 +653,20 @@ code {
 
 .mindshare-board {
   position: relative;
-  width: min(100%, 1220px);
-  aspect-ratio: 1 / 1;
-  min-height: 720px;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  min-height: 680px;
+  max-height: 860px;
   margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(10, 20, 17, 0.42);
   overflow: hidden;
 }
 
 .mindshare-tile-shell {
   position: absolute;
-  padding: 4px;
+  padding: 2px;
 }
 
 .mindshare-tile {
@@ -1020,8 +1021,8 @@ code {
   }
 
   .mindshare-board {
-    aspect-ratio: 4 / 5;
-    min-height: 820px;
+    aspect-ratio: 5 / 4;
+    min-height: 720px;
   }
 }
 
@@ -1077,7 +1078,7 @@ code {
   }
 
   .mindshare-board {
-    aspect-ratio: 3 / 4;
-    min-height: 920px;
+    aspect-ratio: 4 / 5;
+    min-height: 760px;
   }
 }
