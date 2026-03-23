@@ -51,20 +51,31 @@ function formatDelta(value: number, mode: MindshareMode) {
   return `${rounded > 0 ? "+" : ""}${rounded}`;
 }
 
-function getTileSize(share: number, index: number) {
-  if (index === 0 || share >= 14) {
-    return "mindshare-tile-hero";
-  }
+const TILE_LAYOUT_PATTERN = [
+  "mindshare-tile-hero",
+  "mindshare-tile-hero",
+  "mindshare-tile-hero",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-medium",
+  "mindshare-tile-small",
+  "mindshare-tile-small",
+  "mindshare-tile-small",
+  "mindshare-tile-small",
+  "mindshare-tile-small",
+  "mindshare-tile-small",
+  "mindshare-tile-wide",
+  "mindshare-tile-wide",
+  "mindshare-tile-wide"
+] as const;
 
-  if (share >= 8) {
-    return "mindshare-tile-large";
-  }
-
-  if (share >= 4) {
-    return "mindshare-tile-medium";
-  }
-
-  return "mindshare-tile-small";
+function getTileSize(index: number) {
+  return TILE_LAYOUT_PATTERN[index] ?? "mindshare-tile-small";
 }
 
 export function ProjectMindshareBoard({
@@ -337,7 +348,7 @@ export function ProjectMindshareBoard({
           {tiles.map((entry, index) => {
             const momentumValue = mode === "absolute" ? entry.deltaAbsolute : entry.deltaRelative;
             const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-            const tileClass = `mindshare-tile ${getTileSize(entry.share, index)} ${tone}`;
+            const tileClass = `mindshare-tile ${getTileSize(index)} ${tone}`;
 
             return (
               <article key={entry.project.id} className={tileClass}>
