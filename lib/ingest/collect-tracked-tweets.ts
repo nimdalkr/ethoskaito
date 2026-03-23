@@ -1,3 +1,4 @@
+import { getTrustTierRank } from "@/lib/analytics/tier";
 import { prisma } from "@/lib/db";
 import {
   DEFAULT_COLLECTOR_SHARDS,
@@ -104,6 +105,13 @@ function sortCandidates(mode: CollectorMode, accounts: any[]) {
   const now = Date.now();
 
   return [...accounts].sort((left, right) => {
+    const leftTierRank = getTrustTierRank(left.ethosUser?.trustTier);
+    const rightTierRank = getTrustTierRank(right.ethosUser?.trustTier);
+
+    if (rightTierRank !== leftTierRank) {
+      return rightTierRank - leftTierRank;
+    }
+
     if (mode === "hot") {
       return (
         right.priorityScore - left.priorityScore ||
@@ -165,8 +173,10 @@ async function getCollectionCandidates(input: {
   }
 
   if (input.mode === "hot") {
-    where.priorityScore = {
-      gte: 700
+    where.ethosUser = {
+      trustTier: {
+        in: ["T4", "T3", "T2"]
+      }
     };
   }
 
@@ -185,7 +195,13 @@ async function getCollectionCandidates(input: {
       lastQueuedCount: true,
       priorityScore: true,
       consecutiveFailures: true,
-      lastCollectorError: true
+      lastCollectorError: true,
+      ethosUser: {
+        select: {
+          trustTier: true,
+          trustComposite: true
+        }
+      }
     },
     take: Math.max(input.accountLimit * 4, 500),
     orderBy: [

@@ -24,6 +24,14 @@ export function getTrustTierLabel(tier: TrustTier) {
   return TRUST_TIER_LABELS[tier];
 }
 
+export function getTrustTierRank(tier: TrustTier | null | undefined) {
+  if (!tier) {
+    return -1;
+  }
+
+  return TRUST_TIER_ORDER.indexOf(tier);
+}
+
 export function getTierWeight(tier: TrustTier) {
   switch (tier) {
     case "T4":
