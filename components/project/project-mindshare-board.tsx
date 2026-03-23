@@ -253,11 +253,7 @@ function mergeTreemapEntries(entries: RankedEntry[]) {
 }
 
 function shouldMergeTile(entry: RankedEntry, rect: TreemapRect<RankedEntry>) {
-  const minSide = Math.min(rect.width, rect.height);
-  const maxSide = Math.max(rect.width, rect.height);
-  const aspectRatio = minSide > 0 ? maxSide / minSide : Number.POSITIVE_INFINITY;
-
-  return !entry.isOthers && (entry.share < 2 || minSide < 10 || aspectRatio > 6.5);
+  return !entry.isOthers && entry.share < 2;
 }
 
 function buildDisplayTreemap(entries: RankedEntry[]) {
