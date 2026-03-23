@@ -704,17 +704,33 @@ export function ProjectMindshareBoard({
                   tight ? " mindshare-layout-tight" : ""
                 }${micro ? " mindshare-layout-micro" : ""}`}
               >
-                <div className="mindshare-meta">
-                  <div className="mindshare-title-row">
-                    {entry.project.logoUrl ? (
-                      <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
-                    ) : (
-                      <div className="mindshare-dot" />
-                    )}
-                    <strong>{entry.project.name}</strong>
+                {micro ? (
+                  <div className="mindshare-micro-row">
+                    <div className="mindshare-title-row">
+                      {entry.project.logoUrl ? (
+                        <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
+                      ) : (
+                        <div className="mindshare-dot" />
+                      )}
+                      <strong>{entry.project.name}</strong>
+                    </div>
+                    <div className="mindshare-share mindshare-share-inline">{formatShare(entry.share)}</div>
                   </div>
-                </div>
-                {showShare ? <div className="mindshare-share">{formatShare(entry.share)}</div> : null}
+                ) : (
+                  <>
+                    <div className="mindshare-meta">
+                      <div className="mindshare-title-row">
+                        {entry.project.logoUrl ? (
+                          <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
+                        ) : (
+                          <div className="mindshare-dot" />
+                        )}
+                        <strong>{entry.project.name}</strong>
+                      </div>
+                    </div>
+                    {showShare ? <div className="mindshare-share">{formatShare(entry.share)}</div> : null}
+                  </>
+                )}
                 {!micro ? <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div> : null}
                 {showSparkline ? (
                   <div className={`mindshare-sparkline ${sparklineClass}`} aria-hidden="true">
