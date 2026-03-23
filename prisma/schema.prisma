@@ -104,6 +104,19 @@ model CollectorShardState {
   @@index([mode, updatedAt])
 }
 
+model WorkerLease {
+  id          String   @id @default(cuid())
+  workerType  String   @unique
+  holderId    String
+  acquiredAt  DateTime @default(now())
+  heartbeatAt DateTime @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workerType, expiresAt])
+}
+
 model Tweet {
   id             String        @id @default(cuid())
   tweetId        String        @unique

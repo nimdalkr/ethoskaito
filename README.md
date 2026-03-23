@@ -101,7 +101,7 @@ The sync will:
 Trigger the internal collector with:
 
 ```bash
-curl -X POST "http://localhost:3000/api/cron/collect?accounts=100&tweets=5&concurrency=5" \
+curl -X POST "http://localhost:3000/api/cron/collect?accounts=700&tweets=1&concurrency=10" \
   -H "authorization: Bearer $CRON_SECRET"
 ```
 
@@ -111,5 +111,30 @@ The collector will:
 - prioritize never-collected accounts first, then rotate through the oldest collected accounts
 - fetch the latest tweet IDs from X guest GraphQL
 - skip tweet IDs already stored in the database
+- stop scanning older timeline entries once the account's `lastSeenTweetId` is encountered
 - pass unseen tweets into the existing FxTwitter-based ingest pipeline
 - store per-account collection status on `TrackedAccount`
+
+## Worker Mode
+
+For reliable 24-hour coverage, run a separate long-lived worker instead of relying only on Vercel cron:
+
+```bash
+npm run collector:supervisor
+```
+
+The supervisor:
+
+- acquires a DB-backed `WorkerLease` so only one active supervisor runs at a time
+- runs `main -> repair -> hot` cycles continuously
+- renews its lease during shard processing
+- uses lighter `main` settings by default: `700 accounts`, `1 tweet/account`, `concurrency 10`
+
+Useful env vars:
+
+```bash
+COLLECTOR_SHARDS=40
+COLLECTOR_LEASE_SECONDS=300
+COLLECTOR_MAIN_PAUSE_MS=30000
+COLLECTOR_CYCLE_PAUSE_MS=900000
+```
