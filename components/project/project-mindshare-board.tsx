@@ -201,7 +201,8 @@ function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, widt
     { w: 5, h: 5 },
     { w: 5, h: 6 },
     { w: 6, h: 5 },
-    { w: 6, h: 6 }
+    { w: 6, h: 6 },
+    { w: 7, h: 6 }
   ];
 
   const chooseDimensions = (targetArea: number) => {
@@ -284,9 +285,46 @@ function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, widt
     }
   }
 
+  const hasCollisionAt = (candidate: { x: number; y: number; cellsWide: number; cellsHigh: number }, ignoreIndex: number) => {
+    return placements.some((placedRect, index) => {
+      if (index === ignoreIndex) {
+        return false;
+      }
+
+      return !(
+        candidate.x + candidate.cellsWide <= placedRect.x ||
+        placedRect.x + placedRect.cellsWide <= candidate.x ||
+        candidate.y + candidate.cellsHigh <= placedRect.y ||
+        placedRect.y + placedRect.cellsHigh <= candidate.y
+      );
+    });
+  };
+
+  placements.sort((left, right) => left.y - right.y || left.x - right.x);
+
+  for (let index = 0; index < placements.length; index += 1) {
+    const rect = placements[index];
+
+    while (rect.y > 0) {
+      const candidate = { ...rect, y: rect.y - 1 };
+      if (hasCollisionAt(candidate, index)) {
+        break;
+      }
+      rect.y -= 1;
+    }
+
+    while (rect.x > 0) {
+      const candidate = { ...rect, x: rect.x - 1 };
+      if (hasCollisionAt(candidate, index)) {
+        break;
+      }
+      rect.x -= 1;
+    }
+  }
+
   const rowsUsed = Math.max(...placements.map((rect) => rect.y + rect.cellsHigh), 1);
   const cellSize = width / columns;
-  const rowSize = cellSize * 0.82;
+  const rowSize = cellSize * 0.74;
 
   return {
     rects: placements.map((rect) => ({
@@ -649,8 +687,17 @@ export function ProjectMindshareBoard({
     const others = createOthersEntry(remainder, MAX_VISIBLE_ITEMS);
     return others ? [...leaders, others] : board.ranked.slice(0, MAX_VISIBLE_ITEMS);
   }, [board.ranked]);
-  const layout = useMemo(() => createMindshareMosaic(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardWidth), [boardWidth, visibleEntries]);
-  const boardHeight = Math.max(layout.height, boardWidth >= 840 ? 780 : boardWidth >= 640 ? 900 : 960);
+  const arrangedEntries = useMemo(() => {
+    const others = visibleEntries.find((entry) => entry.isOthers);
+    if (!others) {
+      return visibleEntries;
+    }
+
+    const regular = visibleEntries.filter((entry) => !entry.isOthers);
+    return [...regular.slice(0, 5), others, ...regular.slice(5)];
+  }, [visibleEntries]);
+  const layout = useMemo(() => createMindshareMosaic(arrangedEntries.map((entry) => ({ item: entry, value: entry.share })), boardWidth), [arrangedEntries, boardWidth]);
+  const boardHeight = Math.max(layout.height, boardWidth >= 1240 ? 640 : boardWidth >= 980 ? 700 : boardWidth >= 720 ? 820 : 920);
 
   if (board.ranked.length === 0) {
     return (
