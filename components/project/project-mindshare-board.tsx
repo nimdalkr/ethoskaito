@@ -677,8 +677,12 @@ export function ProjectMindshareBoard({
         {treemap.map(({ item: entry, x, y, width, height }) => {
           const tone =
             entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
-          const compact = width < 180 || height < 130;
-          const showSparkline = !entry.isOthers && width >= 220 && height >= 150;
+          const compact = width < 220 || height < 140;
+          const tight = width < 180 || height < 118;
+          const micro = width < 145 || height < 92;
+          const showSparkline = !entry.isOthers && width >= 250 && height >= 165;
+          const showSubtle = !micro;
+          const showShare = !micro || entry.share >= 2.5;
 
           return (
             <div
@@ -694,7 +698,11 @@ export function ProjectMindshareBoard({
               onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
               onClick={() => setSelectedEntry(entry)}
             >
-              <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}`}>
+              <article
+                className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}${
+                  tight ? " mindshare-layout-tight" : ""
+                }${micro ? " mindshare-layout-micro" : ""}`}
+              >
                 <div className="mindshare-meta">
                   <div className="mindshare-title-row">
                     {entry.project.logoUrl ? (
@@ -705,8 +713,8 @@ export function ProjectMindshareBoard({
                     <strong>{entry.project.name}</strong>
                   </div>
                 </div>
-                <div className="mindshare-share">{formatShare(entry.share)}</div>
-                <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div>
+                {showShare ? <div className="mindshare-share">{formatShare(entry.share)}</div> : null}
+                {!micro ? <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div> : null}
                 {showSparkline ? (
                   <div className="mindshare-sparkline" aria-hidden="true">
                     <svg viewBox="0 0 100 28" preserveAspectRatio="none">
@@ -714,7 +722,9 @@ export function ProjectMindshareBoard({
                     </svg>
                   </div>
                 ) : null}
-                {!compact ? <div className="mindshare-subtle">{entry.isOthers ? "aggregated tail" : `${Math.round(entry.highTierShare)}% high-tier`}</div> : null}
+                {!compact && showSubtle ? (
+                  <div className="mindshare-subtle">{entry.isOthers ? "aggregated tail" : `${Math.round(entry.highTierShare)}% high-tier`}</div>
+                ) : null}
               </article>
             </div>
           );

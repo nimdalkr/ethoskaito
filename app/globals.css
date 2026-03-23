@@ -739,6 +739,7 @@ code {
   line-height: 1.06;
   letter-spacing: -0.04em;
   max-width: 92%;
+  min-width: 0;
   text-wrap: balance;
 }
 
@@ -826,6 +827,55 @@ code {
 
 .mindshare-scale-small .mindshare-title-row strong {
   font-size: clamp(0.84rem, 1.1vw, 1rem);
+}
+
+.mindshare-layout-tight {
+  padding: 12px 12px 10px;
+  gap: 8px;
+}
+
+.mindshare-layout-tight .mindshare-title-row {
+  gap: 6px;
+}
+
+.mindshare-layout-tight .mindshare-title-row strong,
+.mindshare-layout-micro .mindshare-title-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-wrap: nowrap;
+  max-width: 100%;
+}
+
+.mindshare-layout-tight .mindshare-logo {
+  width: 16px;
+  height: 16px;
+}
+
+.mindshare-layout-tight .mindshare-share {
+  font-size: clamp(0.96rem, 1.2vw, 1.2rem);
+}
+
+.mindshare-layout-tight .mindshare-corner {
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  font-size: 0.64rem;
+}
+
+.mindshare-layout-micro {
+  padding: 10px 10px 8px;
+  gap: 6px;
+}
+
+.mindshare-layout-micro .mindshare-logo,
+.mindshare-layout-micro .mindshare-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.mindshare-layout-micro .mindshare-share {
+  font-size: 0.92rem;
 }
 
 .mindshare-rank-gold {
