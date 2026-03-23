@@ -182,31 +182,44 @@ function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, widt
     return { rects: [], height: 0 };
   }
 
-  const columns = width >= 1320 ? 10 : width >= 1080 ? 9 : width >= 840 ? 8 : width >= 640 ? 6 : 4;
-  const nominalCells = Math.max(items.length * 7, columns * 9);
+  const columns = width >= 1440 ? 14 : width >= 1240 ? 12 : width >= 980 ? 10 : width >= 720 ? 8 : 6;
+  const nominalCells = Math.max(items.length * 5, columns * 6);
   const totalValue = sumValues(items);
   const occupied = new Set<string>();
   const minimumArea = 4;
   const minimumSide = 2;
+  const palette = [
+    { w: 2, h: 2 },
+    { w: 2, h: 3 },
+    { w: 3, h: 2 },
+    { w: 3, h: 3 },
+    { w: 3, h: 4 },
+    { w: 4, h: 3 },
+    { w: 4, h: 4 },
+    { w: 4, h: 5 },
+    { w: 5, h: 4 },
+    { w: 5, h: 5 },
+    { w: 5, h: 6 },
+    { w: 6, h: 5 },
+    { w: 6, h: 6 }
+  ];
 
   const chooseDimensions = (targetArea: number) => {
     const candidates: Array<{ w: number; h: number; area: number; score: number }> = [];
 
-    for (let w = minimumSide; w <= columns; w += 1) {
-      for (let h = minimumSide; h <= 12; h += 1) {
-        const area = w * h;
-        if (area < targetArea) {
-          continue;
-        }
-
-        const ratio = w / h;
-        if (ratio < 0.7 || ratio > 1.45) {
-          continue;
-        }
-
-        const score = (area - targetArea) * 1.8 + Math.abs(w - h) * 2.4 + Math.abs(ratio - 1) * 4;
-        candidates.push({ w, h, area, score });
+    for (const shape of palette) {
+      if (shape.w > columns) {
+        continue;
       }
+
+      const area = shape.w * shape.h;
+      const ratio = shape.w / shape.h;
+      if (ratio < 0.66 || ratio > 1.5) {
+        continue;
+      }
+
+      const score = Math.abs(area - targetArea) * 1.5 + Math.abs(shape.w - shape.h) * 1.6 + Math.max(0, area - targetArea) * 0.5;
+      candidates.push({ w: shape.w, h: shape.h, area, score });
     }
 
     candidates.sort((left, right) => left.score - right.score || left.area - right.area);
@@ -273,16 +286,17 @@ function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, widt
 
   const rowsUsed = Math.max(...placements.map((rect) => rect.y + rect.cellsHigh), 1);
   const cellSize = width / columns;
+  const rowSize = cellSize * 0.82;
 
   return {
     rects: placements.map((rect) => ({
       item: rect.item,
       x: rect.x * cellSize,
-      y: rect.y * cellSize,
+      y: rect.y * rowSize,
       width: rect.cellsWide * cellSize,
-      height: rect.cellsHigh * cellSize
+      height: rect.cellsHigh * rowSize
     })),
-    height: rowsUsed * cellSize
+    height: rowsUsed * rowSize
   };
 }
 
