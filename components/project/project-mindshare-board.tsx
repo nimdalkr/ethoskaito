@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
@@ -165,110 +165,6 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
   return placed;
 }
 
-function createOthersProject(): ProjectSnapshot {
-  return {
-    id: "others",
-    projectId: -1,
-    userkey: "external:others",
-    name: "Others",
-    username: null,
-    description: null,
-    categories: [],
-    chains: [],
-    totalVotes: 0,
-    uniqueVoters: 0,
-    bullishVotes: 0,
-    bearishVotes: 0,
-    commentCount: 0,
-    aliases: []
-  };
-}
-
-function mergeTreemapEntries(entries: RankedEntry[], selectedWindow: WindowDays): RankedEntry[] {
-  if (entries.length === 0) {
-    return [];
-  }
-
-  const authors = new Set<string>();
-  const metricsByWindow = Object.fromEntries(
-    WINDOW_DAY_VALUES.map((days) => [
-      days,
-      {
-        currentWeight: 0,
-        previousWeight: 0,
-        share: 0,
-        deltaAbsolute: 0,
-        deltaRelative: 0
-      }
-    ])
-  ) as Record<WindowDays, WindowMetrics>;
-  const sparkline = Array.from({ length: SPARKLINE_BINS }, () => 0);
-
-  let currentWeight = 0;
-  let highTierWeighted = 0;
-
-  for (const entry of entries) {
-    for (const author of entry.authors) {
-      authors.add(author);
-    }
-
-    currentWeight += entry.currentWeight;
-    highTierWeighted += (entry.highTierShare / 100) * entry.currentWeight;
-
-    for (const days of WINDOW_DAY_VALUES) {
-      metricsByWindow[days].currentWeight += entry.metricsByWindow[days].currentWeight;
-      metricsByWindow[days].previousWeight += entry.metricsByWindow[days].previousWeight;
-    }
-
-    entry.sparkline.forEach((value, index) => {
-      sparkline[index] += value;
-    });
-  }
-
-  for (const days of WINDOW_DAY_VALUES) {
-    const current = metricsByWindow[days].currentWeight;
-    const previous = metricsByWindow[days].previousWeight;
-    metricsByWindow[days].share = entries.reduce((sum, entry) => sum + entry.metricsByWindow[days].share, 0);
-    metricsByWindow[days].deltaAbsolute = current - previous;
-    metricsByWindow[days].deltaRelative = previous > 0 ? ((current - previous) / previous) * 100 : current > 0 ? 100 : 0;
-  }
-
-  return [
-    {
-      project: createOthersProject(),
-      currentWeight,
-      share: entries.reduce((sum, entry) => sum + entry.share, 0),
-      selectedDeltaAbsolute: metricsByWindow[selectedWindow].deltaAbsolute,
-      selectedDeltaRelative: metricsByWindow[selectedWindow].deltaRelative,
-      highTierShare: currentWeight > 0 ? (highTierWeighted / currentWeight) * 100 : 0,
-      authors,
-      sparkline,
-      metricsByWindow,
-      isOthers: true
-    }
-  ];
-}
-
-function buildDisplayTreemap(entries: RankedEntry[], selectedWindow: WindowDays) {
-  let working = [...entries];
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const treemap = createTreemapLayout(working.map((entry) => ({ item: entry, value: entry.share })));
-    const mergeTargets = treemap.filter((rect) => !rect.item.isOthers && rect.item.share < 2);
-
-    if (mergeTargets.length === 0) {
-      return treemap;
-    }
-
-    const mergeIds = new Set(mergeTargets.map((rect) => rect.item.project.id));
-    const keep = working.filter((entry) => !mergeIds.has(entry.project.id));
-    const merged = mergeTreemapEntries(working.filter((entry) => mergeIds.has(entry.project.id)), selectedWindow);
-    working = [...keep, ...merged].sort((left, right) => right.share - left.share);
-  }
-
-  return createTreemapLayout(working.map((entry) => ({ item: entry, value: entry.share })));
-}
-
 function getTreemapScaleClass(share: number) {
   if (share >= 14) return "mindshare-scale-hero";
   if (share >= 7) return "mindshare-scale-large";
@@ -285,6 +181,30 @@ export function ProjectMindshareBoard({
 }) {
   const [windowKey, setWindowKey] = useState<MindshareWindow>("90d");
   const [tierFilter, setTierFilter] = useState<MindshareTierFilter>("all");
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const [boardSize, setBoardSize] = useState({ width: 1000, height: 1000 });
+
+  useEffect(() => {
+    const node = boardRef.current;
+    if (!node) {
+      return;
+    }
+
+    const updateSize = () => {
+      const nextWidth = Math.max(node.clientWidth, 1);
+      const nextHeight = Math.max(node.clientHeight, 1);
+      setBoardSize((current) =>
+        current.width === nextWidth && current.height === nextHeight ? current : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(() => updateSize());
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
 
   const selectedWindow = WINDOW_OPTIONS.find((option) => option.key === windowKey) ?? WINDOW_OPTIONS[3];
   const selectedTierFilter = TIER_FILTERS.find((option) => option.key === tierFilter) ?? TIER_FILTERS[0];
@@ -442,7 +362,10 @@ export function ProjectMindshareBoard({
   }, [mentions, projects, selectedTierFilter.tiers, selectedWindow.days]);
 
   const topTwenty = board.ranked.slice(0, 20);
-  const treemap = useMemo(() => buildDisplayTreemap(topTwenty, selectedWindow.days), [selectedWindow.days, topTwenty]);
+  const treemap = useMemo(
+    () => createTreemapLayout(topTwenty.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
+    [boardSize.height, boardSize.width, topTwenty]
+  );
 
   if (board.ranked.length === 0) {
     return (
@@ -506,7 +429,7 @@ export function ProjectMindshareBoard({
         <strong>{Math.round(board.highTierShare)}% high-tier</strong>
       </div>
 
-      <div className="mindshare-board">
+      <div ref={boardRef} className="mindshare-board">
         {treemap.map(({ item: entry, x, y, width, height }) => {
           const momentumValue = entry.selectedDeltaRelative;
           const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
@@ -518,10 +441,10 @@ export function ProjectMindshareBoard({
               key={entry.project.id}
               className="mindshare-tile-shell"
               style={{
-                left: `${x}%`,
-                top: `${y}%`,
-                width: `${width}%`,
-                height: `${height}%`
+                left: `${x}px`,
+                top: `${y}px`,
+                width: `${width}px`,
+                height: `${height}px`
               }}
             >
               <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`}>
@@ -533,15 +456,7 @@ export function ProjectMindshareBoard({
                 </div>
                 <div className="mindshare-share">{formatShare(entry.share)}</div>
                 {!compact ? <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div> : null}
-                {!tiny ? (
-                  <div className="mindshare-sparkline" aria-hidden="true">
-                    {entry.sparkline.map((value, index) => {
-                      const max = Math.max(...entry.sparkline, 1);
-                      const heightPct = `${Math.max(8, (value / max) * 100)}%`;
-                      return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
-                    })}
-                  </div>
-                ) : null}
+                {!tiny ? <div className="mindshare-footer-fill" aria-hidden="true" /> : null}
               </article>
             </div>
           );

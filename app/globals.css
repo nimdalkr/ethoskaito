@@ -653,7 +653,10 @@ code {
 
 .mindshare-board {
   position: relative;
-  height: clamp(640px, 58vw, 860px);
+  width: min(100%, 1220px);
+  aspect-ratio: 1 / 1;
+  min-height: 720px;
+  margin: 0 auto;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.015);
@@ -677,6 +680,7 @@ code {
   border: 1px solid rgba(242, 211, 127, 0.74);
   overflow: hidden;
   gap: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .mindshare-tile::before {
@@ -757,22 +761,20 @@ code {
   font-weight: 700;
 }
 
-.mindshare-sparkline {
-  position: absolute;
-  inset: auto 16px 14px 16px;
-  height: 34%;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.mindshare-spark-bar {
-  flex: 1 1 0;
-  min-height: 8%;
-  border-radius: 999px 999px 0 0;
-  background: rgba(255, 255, 255, 0.28);
+.mindshare-footer-fill {
+  margin-top: auto;
+  height: 28%;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.12) 0,
+      rgba(255, 255, 255, 0.12) 8px,
+      rgba(255, 255, 255, 0.02) 8px,
+      rgba(255, 255, 255, 0.02) 18px
+    );
+  opacity: 0.45;
 }
 
 .mindshare-scale-hero .mindshare-share {
@@ -1018,7 +1020,8 @@ code {
   }
 
   .mindshare-board {
-    height: 820px;
+    aspect-ratio: 4 / 5;
+    min-height: 820px;
   }
 }
 
@@ -1074,6 +1077,7 @@ code {
   }
 
   .mindshare-board {
-    height: 920px;
+    aspect-ratio: 3 / 4;
+    min-height: 920px;
   }
 }

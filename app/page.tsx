@@ -123,7 +123,7 @@ export default async function Page() {
             <div className="stack-3">
               <CardTitle>Mindshare arena</CardTitle>
               <p className="muted-copy compact-copy">
-                Weighted project attention from the Ethos cohort, with Kaito-style movers on the left and a live share treemap on the right.
+                Weighted project attention from the Ethos cohort, allocated proportionally across the top twenty projects for each time window and trust cohort.
               </p>
             </div>
             <Badge tone="accent">Live cohort mindshare</Badge>
