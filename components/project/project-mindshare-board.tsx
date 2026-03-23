@@ -287,7 +287,7 @@ export function ProjectMindshareBoard({
   projects: ProjectSnapshot[];
   mentions: ProjectMention[];
 }) {
-  const [windowKey, setWindowKey] = useState<MindshareWindow>("7d");
+  const [windowKey, setWindowKey] = useState<MindshareWindow>("90d");
   const [mode, setMode] = useState<MindshareMode>("absolute");
   const [tierFilter, setTierFilter] = useState<MindshareTierFilter>("all");
 
