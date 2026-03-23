@@ -276,15 +276,6 @@ function getTreemapScaleClass(share: number) {
   return "mindshare-scale-small";
 }
 
-function getTileSpan(share: number, maxShare: number) {
-  const normalized = Math.max(share / Math.max(maxShare, 1), 0.12);
-  const targetArea = Math.max(4, Math.min(36, Math.round(normalized * 36)));
-  const cols = Math.max(2, Math.min(6, Math.round(Math.sqrt(targetArea))));
-  const rows = Math.max(2, Math.min(6, Math.ceil(targetArea / cols)));
-
-  return { cols, rows };
-}
-
 export function ProjectMindshareBoard({
   projects,
   mentions
@@ -452,7 +443,6 @@ export function ProjectMindshareBoard({
 
   const topTwenty = board.ranked.slice(0, 20);
   const treemap = useMemo(() => buildDisplayTreemap(topTwenty, selectedWindow.days), [selectedWindow.days, topTwenty]);
-  const maxShare = treemap.reduce((max, rect) => Math.max(max, rect.item.share), 0);
 
   if (board.ranked.length === 0) {
     return (
@@ -516,37 +506,44 @@ export function ProjectMindshareBoard({
         <strong>{Math.round(board.highTierShare)}% high-tier</strong>
       </div>
 
-      <div className="mindshare-grid-board">
-        {treemap.map(({ item: entry }) => {
+      <div className="mindshare-board">
+        {treemap.map(({ item: entry, x, y, width, height }) => {
           const momentumValue = entry.selectedDeltaRelative;
           const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-          const span = getTileSpan(entry.share, maxShare);
+          const compact = width < 16 || height < 14;
+          const tiny = width < 11 || height < 10;
 
           return (
-            <article
+            <div
               key={entry.project.id}
-              className={`mindshare-grid-tile ${tone} ${getTreemapScaleClass(entry.share)}`}
+              className="mindshare-tile-shell"
               style={{
-                gridColumn: `span ${span.cols}`,
-                gridRow: `span ${span.rows}`
+                left: `${x}%`,
+                top: `${y}%`,
+                width: `${width}%`,
+                height: `${height}%`
               }}
             >
-              <div className="mindshare-meta">
-                <div className="mindshare-title-row">
-                  <div className="mindshare-dot" />
-                  <strong>{entry.project.name}</strong>
+              <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`}>
+                <div className="mindshare-meta">
+                  <div className="mindshare-title-row">
+                    <div className="mindshare-dot" />
+                    <strong>{entry.project.name}</strong>
+                  </div>
                 </div>
-              </div>
-              <div className="mindshare-share">{formatShare(entry.share)}</div>
-              <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
-              <div className="mindshare-sparkline" aria-hidden="true">
-                {entry.sparkline.map((value, index) => {
-                  const max = Math.max(...entry.sparkline, 1);
-                  const heightPct = `${Math.max(8, (value / max) * 100)}%`;
-                  return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
-                })}
-              </div>
-            </article>
+                <div className="mindshare-share">{formatShare(entry.share)}</div>
+                {!compact ? <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div> : null}
+                {!tiny ? (
+                  <div className="mindshare-sparkline" aria-hidden="true">
+                    {entry.sparkline.map((value, index) => {
+                      const max = Math.max(...entry.sparkline, 1);
+                      const heightPct = `${Math.max(8, (value / max) * 100)}%`;
+                      return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
+                    })}
+                  </div>
+                ) : null}
+              </article>
+            </div>
           );
         })}
       </div>

@@ -22,6 +22,6 @@ test("mindshare controls and board render", async ({ page }) => {
   }
 
   await page.locator(".mindshare-filter-tabs button").last().click();
-  await expect(page.locator(".mindshare-grid-board")).toBeVisible();
-  await expect(page.locator(".mindshare-grid-tile").first()).toBeVisible();
+  await expect(page.locator(".mindshare-board")).toBeVisible();
+  await expect(page.locator(".mindshare-tile-shell").first()).toBeVisible();
 });
