@@ -480,7 +480,9 @@ export function ProjectMindshareBoard({
   }, [mentions, mode, projects, selectedTierFilter.tiers, selectedWindow.days]);
 
   const topTwenty = board.ranked.slice(0, 20);
-  const treemap = useMemo(() => buildDisplayTreemap(topTwenty, selectedWindow.days), [selectedWindow.days, topTwenty]);
+  const primaryEntries = topTwenty.slice(0, 9);
+  const secondaryEntries = topTwenty.slice(9, 20);
+  const treemap = useMemo(() => buildDisplayTreemap(primaryEntries, selectedWindow.days), [primaryEntries, selectedWindow.days]);
 
   const renderLeaderboard = (rows: RankedEntry[], tone: "positive" | "negative") => (
     <div className="mindshare-leaderboard">
@@ -620,48 +622,72 @@ export function ProjectMindshareBoard({
           </section>
         </aside>
 
-        <div className="mindshare-board">
-          {treemap.map(({ item: entry, x, y, width, height }) => {
-            const momentumValue = mode === "absolute" ? entry.selectedDeltaAbsolute : entry.selectedDeltaRelative;
-            const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-            const compact = width < 12 || height < 14;
-            const tiny = width < 9 || height < 11;
+        <div className="mindshare-board-split">
+          <div className="mindshare-primary-board">
+            {treemap.map(({ item: entry, x, y, width, height }) => {
+              const momentumValue = mode === "absolute" ? entry.selectedDeltaAbsolute : entry.selectedDeltaRelative;
+              const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
+              const compact = width < 12 || height < 14;
+              const tiny = width < 9 || height < 11;
 
-            return (
-              <div
-                key={entry.project.id}
-                className="mindshare-tile-shell"
-                style={{
-                  left: `${x}%`,
-                  top: `${y}%`,
-                  width: `${width}%`,
-                  height: `${height}%`
-                }}
-              >
-                <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`}>
-                  <div className="mindshare-meta">
-                    <div className="mindshare-title-row">
-                      <div className="mindshare-dot" />
-                      <strong>{entry.project.name}</strong>
+              return (
+                <div
+                  key={entry.project.id}
+                  className="mindshare-tile-shell"
+                  style={{
+                    left: `${x}%`,
+                    top: `${y}%`,
+                    width: `${width}%`,
+                    height: `${height}%`
+                  }}
+                >
+                  <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`}>
+                    <div className="mindshare-meta">
+                      <div className="mindshare-title-row">
+                        <div className="mindshare-dot" />
+                        <strong>{entry.project.name}</strong>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mindshare-share">{formatShare(entry.share)}</div>
-                  {!tiny ? (
-                    <div className="mindshare-sparkline" aria-hidden="true">
-                      {entry.sparkline.map((value, index) => {
-                        const max = Math.max(...entry.sparkline, 1);
-                        const heightPct = `${Math.max(8, (value / max) * 100)}%`;
-                        return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
-                      })}
+                    <div className="mindshare-share">{formatShare(entry.share)}</div>
+                    {!tiny ? (
+                      <div className="mindshare-sparkline" aria-hidden="true">
+                        {entry.sparkline.map((value, index) => {
+                          const max = Math.max(...entry.sparkline, 1);
+                          const heightPct = `${Math.max(8, (value / max) * 100)}%`;
+                          return <span key={`${entry.project.id}-spark-${index}`} className="mindshare-spark-bar" style={{ height: heightPct }} />;
+                        })}
+                      </div>
+                    ) : null}
+                    {!compact ? <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div> : null}
+                    {compact ? <div className="mindshare-footer-tag">{Math.round(entry.highTierShare)}% high-tier</div> : null}
+                  </article>
+                </div>
+              );
+            })}
+          </div>
+
+          {secondaryEntries.length > 0 ? (
+            <div className="mindshare-secondary-grid">
+              {secondaryEntries.map((entry) => {
+                const momentumValue = mode === "absolute" ? entry.selectedDeltaAbsolute : entry.selectedDeltaRelative;
+                const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
+
+                return (
+                  <article key={entry.project.id} className={`mindshare-mini-tile ${tone}`}>
+                    <div className="mindshare-mini-head">
+                      <div className="mindshare-title-row">
+                        <div className="mindshare-dot" />
+                        <strong>{entry.project.name}</strong>
+                      </div>
+                      <span className="mindshare-mini-tag">{Math.round(entry.highTierShare)}% high-tier</span>
                     </div>
-                  ) : null}
-                  {!compact ? <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div> : null}
-                  {compact ? <div className="mindshare-footer-tag">{Math.round(entry.highTierShare)}% high-tier</div> : null}
-                </article>
-              </div>
-            );
-          })}
+                    <div className="mindshare-mini-share">{formatShare(entry.share)}</div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

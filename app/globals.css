@@ -746,13 +746,25 @@ code {
   text-overflow: ellipsis;
 }
 
-.mindshare-board {
+.mindshare-board-split {
+  display: grid;
+  grid-template-rows: minmax(460px, 1fr) auto;
+  gap: 12px;
+}
+
+.mindshare-primary-board {
   position: relative;
-  height: clamp(660px, 62vw, 900px);
+  height: clamp(460px, 44vw, 640px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.015);
   overflow: hidden;
+}
+
+.mindshare-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .mindshare-tile-shell {
@@ -859,6 +871,65 @@ code {
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(255, 244, 218, 0.9);
+  color: #6f4d18;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.mindshare-mini-tile {
+  min-height: 106px;
+  border: 1px solid rgba(242, 211, 127, 0.58);
+  border-radius: 18px;
+  padding: 14px 14px 12px;
+  display: grid;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mindshare-mini-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.mindshare-mini-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mindshare-mini-head .mindshare-title-row {
+  gap: 7px;
+}
+
+.mindshare-mini-head .mindshare-title-row strong {
+  font-size: 0.92rem;
+  line-height: 1.08;
+}
+
+.mindshare-mini-share {
+  position: relative;
+  z-index: 1;
+  font-size: 1.28rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.mindshare-mini-tag {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 244, 218, 0.92);
   color: #6f4d18;
   font-size: 0.66rem;
   font-weight: 700;
@@ -1124,12 +1195,16 @@ code {
     grid-template-columns: 1fr;
   }
 
-   .mindshare-context-row {
+  .mindshare-context-row {
     gap: 10px;
   }
 
-  .mindshare-board {
-    height: 960px;
+  .mindshare-primary-board {
+    height: 780px;
+  }
+
+  .mindshare-secondary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mindshare-leaderboard-head,
@@ -1187,5 +1262,9 @@ code {
   .hero-title {
     max-width: none;
     font-size: clamp(2rem, 9vw, 3rem);
+  }
+
+  .mindshare-secondary-grid {
+    grid-template-columns: 1fr;
   }
 }
