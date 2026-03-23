@@ -378,7 +378,6 @@ export function ProjectMindshareBoard({
                   ? "mindshare-negative"
                   : "mindshare-neutral";
             const tileClass = `mindshare-tile ${getTileSize(index)} ${tone}`;
-            const totalTierWeight = Object.values(entry.tierWeights).reduce((sum, value) => sum + value, 0);
 
             return (
               <article key={entry.project.id} className={tileClass}>
@@ -387,38 +386,6 @@ export function ProjectMindshareBoard({
                     <div className="mindshare-dot" />
                     <strong>{entry.project.name}</strong>
                   </div>
-                  <span className="mindshare-handle">{entry.project.username ? `@${entry.project.username}` : entry.project.aliases[0] ?? "External project"}</span>
-                </div>
-
-                <div className="mindshare-body">
-                  <div className="mindshare-primary-metric">
-                    <strong>{formatShare(entry.share)}</strong>
-                    <span>share</span>
-                  </div>
-                  <div className="mindshare-context-row">
-                    <span>{entry.authors.size} authors</span>
-                    <strong className={entry.deltaAbsolute > 0 ? "mindshare-delta-positive" : entry.deltaAbsolute < 0 ? "mindshare-delta-negative" : "mindshare-delta-neutral"}>
-                      {formatDelta(mode === "absolute" ? entry.deltaAbsolute : entry.deltaRelative, mode)}
-                    </strong>
-                  </div>
-                  <div className="mindshare-context-row">
-                    <span>{Math.round(entry.weighted)} weighted</span>
-                    <span>{getTierContributionLabel(entry)}</span>
-                  </div>
-                </div>
-
-                <div className="mindshare-tier-strip" aria-label={`${entry.project.name} tier contribution`}>
-                  {(Object.entries(entry.tierWeights) as Array<[TrustTier, number]>).map(([tier, value]) => {
-                    const width = totalTierWeight > 0 ? `${(value / totalTierWeight) * 100}%` : "0%";
-                    return (
-                      <span
-                        key={`${entry.project.id}-${tier}`}
-                        className={`mindshare-tier-segment mindshare-tier-${tier.toLowerCase()}`}
-                        style={{ width }}
-                        title={`${getTrustTierLabel(tier)} ${Math.round(value)}`}
-                      />
-                    );
-                  })}
                 </div>
 
                 <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
