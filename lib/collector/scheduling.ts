@@ -1,4 +1,5 @@
 export type CollectorMode = "main" | "repair" | "hot";
+export type CollectorFailureReason = "generic" | "rate_limit";
 
 export const DEFAULT_COLLECTOR_SHARDS = 40;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -33,7 +34,14 @@ export function getPriorityScore(input: {
   return trustScore + queuedBonus + recencyBonus;
 }
 
-export function getFailureCooldownMs(consecutiveFailures: number) {
+export function getFailureCooldownMs(consecutiveFailures: number, reason: CollectorFailureReason = "generic") {
+  if (reason === "rate_limit") {
+    if (consecutiveFailures <= 0) return 30 * 60 * 1000;
+    if (consecutiveFailures === 1) return 2 * HOUR_MS;
+    if (consecutiveFailures === 2) return 6 * HOUR_MS;
+    return 12 * HOUR_MS;
+  }
+
   if (consecutiveFailures <= 0) return 0;
   if (consecutiveFailures === 1) return 6 * HOUR_MS;
   if (consecutiveFailures === 2) return DAY_MS;
@@ -62,11 +70,12 @@ export function getNextEligibleAt(options: {
   now?: Date;
   consecutiveFailures?: number;
   success: boolean;
+  failureReason?: CollectorFailureReason;
 }) {
   const now = options.now ?? new Date();
   const offsetMs = options.success
     ? getSweepIntervalMs(options.mode, options.priorityScore)
-    : getFailureCooldownMs(options.consecutiveFailures ?? 1);
+    : getFailureCooldownMs(options.consecutiveFailures ?? 1, options.failureReason);
 
   return new Date(now.getTime() + offsetMs);
 }

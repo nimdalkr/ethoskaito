@@ -37,24 +37,24 @@ function normalizeMode(value: string | null): CollectorMode {
 function getDefaultBatchConfig(mode: CollectorMode) {
   if (mode === "repair") {
     return {
-      accountLimit: 400,
+      accountLimit: 180,
       tweetsPerAccount: 2,
-      concurrency: 8
+      concurrency: 3
     };
   }
 
   if (mode === "hot") {
     return {
-      accountLimit: 300,
-      tweetsPerAccount: 3,
-      concurrency: 10
+      accountLimit: 160,
+      tweetsPerAccount: 2,
+      concurrency: 4
     };
   }
 
   return {
-    accountLimit: 700,
+    accountLimit: 220,
     tweetsPerAccount: 1,
-    concurrency: 10
+    concurrency: 4
   };
 }
 
@@ -68,6 +68,15 @@ export async function handleCollectorRequest(
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userAgent = request.headers.get("user-agent") ?? "";
+  const isVercelCron = userAgent.includes("vercel-cron/1.0");
+  if (env.COLLECTOR_PRIMARY === "worker" && isVercelCron) {
+    return NextResponse.json({
+      skipped: true,
+      reason: "collector_primary_worker"
+    });
   }
 
   if (!isDatabaseConfigured()) {

@@ -27,6 +27,11 @@ describe("collector scheduling", () => {
     expect(getFailureCooldownMs(3)).toBeGreaterThan(getFailureCooldownMs(1));
   });
 
+  it("backs off rate-limited accounts faster than generic retries", () => {
+    expect(getFailureCooldownMs(1, "rate_limit")).toBeLessThan(getFailureCooldownMs(1));
+    expect(getFailureCooldownMs(3, "rate_limit")).toBeGreaterThan(getFailureCooldownMs(1, "rate_limit"));
+  });
+
   it("keeps hot lane tighter than main sweep", () => {
     expect(getSweepIntervalMs("hot", 950)).toBeLessThan(getSweepIntervalMs("main", 950));
   });

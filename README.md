@@ -101,7 +101,7 @@ The sync will:
 Trigger the internal collector with:
 
 ```bash
-curl -X POST "http://localhost:3000/api/cron/collect?accounts=700&tweets=1&concurrency=10" \
+curl -X POST "http://localhost:3000/api/cron/collect?accounts=220&tweets=1&concurrency=4" \
   -H "authorization: Bearer $CRON_SECRET"
 ```
 
@@ -112,6 +112,7 @@ The collector will:
 - fetch the latest tweet IDs from X guest GraphQL
 - skip tweet IDs already stored in the database
 - stop scanning older timeline entries once the account's `lastSeenTweetId` is encountered
+- apply stronger cooldowns when X responds with `429`
 - pass unseen tweets into the existing FxTwitter-based ingest pipeline
 - store per-account collection status on `TrackedAccount`
 
@@ -128,14 +129,16 @@ The supervisor:
 - acquires a DB-backed `WorkerLease` so only one active supervisor runs at a time
 - runs `main -> repair -> hot` cycles continuously
 - renews its lease during shard processing
-- uses lighter `main` settings by default: `700 accounts`, `1 tweet/account`, `concurrency 10`
+- uses safer `main` settings by default: `220 accounts`, `1 tweet/account`, `concurrency 4`
+- stops a shard early when rate-limit hits spike, instead of burning the whole batch on `429`s
 - can be deployed as a separate Railway service with [railway.worker.toml](/C:/Users/Admin/Desktop/5_Crypto/ethos/railway.worker.toml) + [Dockerfile.worker](/C:/Users/Admin/Desktop/5_Crypto/ethos/Dockerfile.worker)
 
 Useful env vars:
 
 ```bash
+COLLECTOR_PRIMARY=worker
 COLLECTOR_SHARDS=40
 COLLECTOR_LEASE_SECONDS=300
-COLLECTOR_MAIN_PAUSE_MS=30000
+COLLECTOR_MAIN_PAUSE_MS=90000
 COLLECTOR_CYCLE_PAUSE_MS=900000
 ```

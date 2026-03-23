@@ -15,6 +15,10 @@ function normalizeUsername(value: string) {
   return value.trim().replace(/^@+/, "").toLowerCase();
 }
 
+function isRateLimitedErrorMessage(message: string) {
+  return message.includes("status 429");
+}
+
 async function ensureTrackedAccountsFromProjects() {
   const trackedCount = await prisma.trackedAccount.count({
     where: {
@@ -288,6 +292,7 @@ async function collectSingleAccount(input: {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown collector error";
+    const isRateLimited = isRateLimitedErrorMessage(message);
     const existing = await prisma.trackedAccount.findUnique({
       where: { id: input.id },
       select: {
@@ -313,7 +318,8 @@ async function collectSingleAccount(input: {
           priorityScore: existing?.priorityScore ?? 0,
           now: collectedAt,
           consecutiveFailures,
-          success: false
+          success: false,
+          failureReason: isRateLimited ? "rate_limit" : "generic"
         })
       }
     });
@@ -324,7 +330,8 @@ async function collectSingleAccount(input: {
       queued: 0,
       processed: 0,
       source: input.source,
-      error: message
+      error: message,
+      rateLimited: isRateLimited
     };
   }
 }
@@ -351,6 +358,35 @@ async function runWithConcurrency<TInput, TResult>(
 
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => consume()));
   return results;
+}
+
+async function runCollectorAccounts(
+  accounts: any[],
+  concurrency: number,
+  worker: (account: any) => Promise<any>
+) {
+  const results = [];
+  const chunkSize = Math.max(concurrency * 4, concurrency);
+  let stoppedDueToRateLimit = false;
+  let rateLimitHits = 0;
+
+  for (let index = 0; index < accounts.length; index += chunkSize) {
+    const chunk = accounts.slice(index, index + chunkSize);
+    const chunkResults = await runWithConcurrency(chunk, concurrency, worker);
+    results.push(...chunkResults);
+
+    rateLimitHits += chunkResults.filter((result) => result?.rateLimited).length;
+    if (rateLimitHits >= Math.max(3, concurrency)) {
+      stoppedDueToRateLimit = true;
+      break;
+    }
+  }
+
+  return {
+    results,
+    stoppedDueToRateLimit,
+    rateLimitHits
+  };
 }
 
 export async function collectTrackedTweets(options: {
@@ -419,8 +455,8 @@ export async function collectTrackedTweets(options: {
     }
   });
 
-  const accountResults = await xGuestClient.withSession((session) =>
-    runWithConcurrency(accounts, concurrency, (account) =>
+  const accountExecution = await xGuestClient.withSession((session) =>
+    runCollectorAccounts(accounts, concurrency, (account) =>
       collectSingleAccount({
         id: account.id,
         xUsername: account.xUsername,
@@ -432,11 +468,13 @@ export async function collectTrackedTweets(options: {
       })
     )
   );
+  const accountResults = accountExecution.results;
 
   const discovered = accountResults.reduce((sum, account) => sum + account.discovered, 0);
   const queued = accountResults.reduce((sum, account) => sum + account.queued, 0);
   const processed = accountResults.reduce((sum, account) => sum + account.processed, 0);
   const errors = accountResults.filter((account) => "error" in account && Boolean(account.error)).length;
+  const rateLimitErrors = accountResults.filter((account) => account.rateLimited).length;
   const remainingUncollected = await prisma.trackedAccount.count({
     where: {
       isActive: true,
@@ -504,6 +542,8 @@ export async function collectTrackedTweets(options: {
     queued,
     processed,
     errors,
+    rateLimitErrors,
+    stoppedDueToRateLimit: accountExecution.stoppedDueToRateLimit,
     results: accountResults
   };
 }
