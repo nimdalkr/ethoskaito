@@ -680,9 +680,10 @@ export function ProjectMindshareBoard({
           const compact = width < 220 || height < 140;
           const tight = width < 180 || height < 118;
           const micro = width < 145 || height < 92;
-          const showSparkline = !entry.isOthers && width >= 250 && height >= 165;
+          const showSparkline = !entry.isOthers && width >= 150 && height >= 92;
+          const sparklineClass = width >= 250 && height >= 165 ? "mindshare-sparkline-large" : width >= 185 && height >= 110 ? "mindshare-sparkline-medium" : "mindshare-sparkline-mini";
           const showSubtle = !micro;
-          const showShare = !micro || entry.share >= 2.5;
+          const showShare = true;
 
           return (
             <div
@@ -716,7 +717,7 @@ export function ProjectMindshareBoard({
                 {showShare ? <div className="mindshare-share">{formatShare(entry.share)}</div> : null}
                 {!micro ? <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div> : null}
                 {showSparkline ? (
-                  <div className="mindshare-sparkline" aria-hidden="true">
+                  <div className={`mindshare-sparkline ${sparklineClass}`} aria-hidden="true">
                     <svg viewBox="0 0 100 28" preserveAspectRatio="none">
                       <path className="mindshare-sparkline-path" d={buildSparklinePath(entry.trend)} />
                     </svg>
