@@ -44,6 +44,11 @@ type TreemapRect<T> = {
   height: number;
 };
 
+type PackedMindshareLayout<T> = {
+  rects: TreemapRect<T>[];
+  height: number;
+};
+
 const WINDOW_OPTIONS: Array<{ key: MindshareWindow; label: string; days: WindowDays }> = [
   { key: "1d", label: "24H", days: 1 },
   { key: "7d", label: "7D", days: 7 },
@@ -61,7 +66,7 @@ const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: Trus
 
 const WINDOW_DAY_VALUES: WindowDays[] = [1, 7, 30, 90];
 const SPARKLINE_BINS = 24;
-const MAX_VISIBLE_ITEMS = 15;
+const MAX_VISIBLE_ITEMS = 20;
 
 function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
@@ -172,85 +177,113 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
   return placed;
 }
 
-function splitBalancedGroups<T>(items: Array<{ item: T; value: number }>, groupCount: number) {
-  const groups = Array.from({ length: groupCount }, () => [] as Array<{ item: T; value: number }>);
-  const targetSize = Math.ceil(items.length / groupCount);
-  let index = 0;
-
-  for (const item of items) {
-    const groupIndex = Math.min(Math.floor(index / targetSize), groupCount - 1);
-    groups[groupIndex].push(item);
-    index += 1;
+function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, width = 1000): PackedMindshareLayout<T> {
+  if (items.length === 0 || width <= 0) {
+    return { rects: [], height: 0 };
   }
 
-  return groups.filter((group) => group.length > 0);
-}
+  const columns = width >= 1320 ? 10 : width >= 1080 ? 9 : width >= 840 ? 8 : width >= 640 ? 6 : 4;
+  const nominalCells = Math.max(items.length * 7, columns * 9);
+  const totalValue = sumValues(items);
+  const occupied = new Set<string>();
+  const minimumArea = 4;
+  const minimumSide = 2;
 
-function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100, leaderCount = 4) {
-  if (items.length <= leaderCount) {
-    return createTreemapLayout(items, width, height);
-  }
+  const chooseDimensions = (targetArea: number) => {
+    const candidates: Array<{ w: number; h: number; area: number; score: number }> = [];
 
-  const leaders = items.slice(0, leaderCount);
-  const tail = items.slice(leaderCount);
-  const total = sumValues(items);
-  const heroTotal = sumValues(leaders);
-  const tailTotal = Math.max(sumValues(tail), 0);
-  const heroHeight = height * (heroTotal / total);
-  const tailHeight = height - heroHeight;
-  const flattened: TreemapRect<T>[] = [];
+    for (let w = minimumSide; w <= columns; w += 1) {
+      for (let h = minimumSide; h <= 12; h += 1) {
+        const area = w * h;
+        if (area < targetArea) {
+          continue;
+        }
 
-  const heroRows = [leaders.slice(0, 2), leaders.slice(2, 4)].filter((row) => row.length > 0);
-  let currentY = 0;
+        const ratio = w / h;
+        if (ratio < 0.7 || ratio > 1.45) {
+          continue;
+        }
 
-  for (const row of heroRows) {
-    const rowTotal = sumValues(row);
-    const rowHeight = heroHeight * (rowTotal / heroTotal);
-    let currentX = 0;
-
-    for (const entry of row) {
-      const tileWidth = width * (entry.value / rowTotal);
-      flattened.push({
-        item: entry.item,
-        x: currentX,
-        y: currentY,
-        width: tileWidth,
-        height: rowHeight
-      });
-      currentX += tileWidth;
+        const score = (area - targetArea) * 1.8 + Math.abs(w - h) * 2.4 + Math.abs(ratio - 1) * 4;
+        candidates.push({ w, h, area, score });
+      }
     }
 
-    currentY += rowHeight;
-  }
+    candidates.sort((left, right) => left.score - right.score || left.area - right.area);
+    return candidates.length > 0 ? candidates : [{ w: minimumSide, h: Math.max(minimumSide, Math.ceil(targetArea / minimumSide)), area: targetArea, score: 999 }];
+  };
 
-  if (tail.length === 0 || tailHeight <= 0 || tailTotal <= 0) {
-    return flattened;
-  }
-
-  const tailGroups = splitBalancedGroups(tail, Math.min(3, Math.max(2, Math.ceil(tail.length / 4))));
-  let currentX = 0;
-
-  for (const group of tailGroups) {
-    const groupTotal = sumValues(group);
-    const columnWidth = width * (groupTotal / tailTotal);
-    let columnY = heroHeight;
-
-    for (const entry of group) {
-      const tileHeight = tailHeight * (entry.value / groupTotal);
-      flattened.push({
-        item: entry.item,
-        x: currentX,
-        y: columnY,
-        width: columnWidth,
-        height: tileHeight
-      });
-      columnY += tileHeight;
+  const canPlace = (x: number, y: number, w: number, h: number) => {
+    if (x + w > columns) {
+      return false;
     }
 
-    currentX += columnWidth;
+    for (let row = y; row < y + h; row += 1) {
+      for (let col = x; col < x + w; col += 1) {
+        if (occupied.has(`${col}:${row}`)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const markPlaced = (x: number, y: number, w: number, h: number) => {
+    for (let row = y; row < y + h; row += 1) {
+      for (let col = x; col < x + w; col += 1) {
+        occupied.add(`${col}:${row}`);
+      }
+    }
+  };
+
+  const placements: Array<TreemapRect<T> & { cellsWide: number; cellsHigh: number }> = [];
+
+  for (const entry of items) {
+    const targetArea = Math.max(minimumArea, Math.round((entry.value / totalValue) * nominalCells));
+    const candidates = chooseDimensions(targetArea);
+    let placed = false;
+
+    for (const candidate of candidates) {
+      for (let y = 0; y < 64 && !placed; y += 1) {
+        for (let x = 0; x <= columns - candidate.w && !placed; x += 1) {
+          if (!canPlace(x, y, candidate.w, candidate.h)) {
+            continue;
+          }
+
+          markPlaced(x, y, candidate.w, candidate.h);
+          placements.push({
+            item: entry.item,
+            x,
+            y,
+            width: candidate.w,
+            height: candidate.h,
+            cellsWide: candidate.w,
+            cellsHigh: candidate.h
+          });
+          placed = true;
+        }
+      }
+
+      if (placed) {
+        break;
+      }
+    }
   }
 
-  return flattened;
+  const rowsUsed = Math.max(...placements.map((rect) => rect.y + rect.cellsHigh), 1);
+  const cellSize = width / columns;
+
+  return {
+    rects: placements.map((rect) => ({
+      item: rect.item,
+      x: rect.x * cellSize,
+      y: rect.y * cellSize,
+      width: rect.cellsWide * cellSize,
+      height: rect.cellsHigh * cellSize
+    })),
+    height: rowsUsed * cellSize
+  };
 }
 
 function getTreemapScaleClass(share: number) {
@@ -407,7 +440,7 @@ export function ProjectMindshareBoard({
   const [windowKey, setWindowKey] = useState<MindshareWindow>("90d");
   const [tierFilter, setTierFilter] = useState<MindshareTierFilter>("all");
   const boardRef = useRef<HTMLDivElement | null>(null);
-  const [boardSize, setBoardSize] = useState({ width: 1000, height: 1000 });
+  const [boardWidth, setBoardWidth] = useState(1000);
   const [hovered, setHovered] = useState<{ entry: RankedEntry; x: number; y: number } | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<RankedEntry | null>(null);
 
@@ -419,10 +452,7 @@ export function ProjectMindshareBoard({
 
     const updateSize = () => {
       const nextWidth = Math.max(node.clientWidth, 1);
-      const nextHeight = Math.max(node.clientHeight, 1);
-      setBoardSize((current) =>
-        current.width === nextWidth && current.height === nextHeight ? current : { width: nextWidth, height: nextHeight }
-      );
+      setBoardWidth((current) => (current === nextWidth ? current : nextWidth));
     };
 
     updateSize();
@@ -605,10 +635,8 @@ export function ProjectMindshareBoard({
     const others = createOthersEntry(remainder, MAX_VISIBLE_ITEMS);
     return others ? [...leaders, others] : board.ranked.slice(0, MAX_VISIBLE_ITEMS);
   }, [board.ranked]);
-  const treemap = useMemo(
-    () => createMindshareMosaic(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
-    [boardSize.height, boardSize.width, visibleEntries]
-  );
+  const layout = useMemo(() => createMindshareMosaic(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardWidth), [boardWidth, visibleEntries]);
+  const boardHeight = Math.max(layout.height, boardWidth >= 840 ? 780 : boardWidth >= 640 ? 900 : 960);
 
   if (board.ranked.length === 0) {
     return (
@@ -673,8 +701,8 @@ export function ProjectMindshareBoard({
         {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS - 1} + others of {board.ranked.length}</span> : null}
       </div>
 
-      <div ref={boardRef} className="mindshare-board">
-        {treemap.map(({ item: entry, x, y, width, height }) => {
+      <div ref={boardRef} className="mindshare-board" style={{ height: `${boardHeight}px` }}>
+        {layout.rects.map(({ item: entry, x, y, width, height }) => {
           const tone =
             entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
           const compact = width < 220 || height < 140;
