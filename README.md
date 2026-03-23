@@ -129,6 +129,7 @@ The supervisor:
 - runs `main -> repair -> hot` cycles continuously
 - renews its lease during shard processing
 - uses lighter `main` settings by default: `700 accounts`, `1 tweet/account`, `concurrency 10`
+- can be deployed as a separate Railway service with [railway.worker.toml](/C:/Users/Admin/Desktop/5_Crypto/ethos/railway.worker.toml) + [Dockerfile.worker](/C:/Users/Admin/Desktop/5_Crypto/ethos/Dockerfile.worker)
 
 Useful env vars:
 
