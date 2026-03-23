@@ -171,6 +171,44 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
   return placed;
 }
 
+function createNestedTreemap<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100, leaderCount = 4) {
+  if (items.length <= leaderCount + 1) {
+    return createTreemapLayout(items, width, height);
+  }
+
+  const leaders = items.slice(0, leaderCount);
+  const tail = items.slice(leaderCount);
+  const tailValue = sumValues(tail);
+
+  const grouped = createTreemapLayout(
+    [
+      ...leaders,
+      { item: null as T, value: tailValue }
+    ],
+    width,
+    height
+  );
+
+  const flattened: TreemapRect<T>[] = [];
+
+  for (const rect of grouped) {
+    if (rect.item === null) {
+      const nested = createTreemapLayout(tail, rect.width, rect.height).map((child) => ({
+        item: child.item,
+        x: rect.x + child.x,
+        y: rect.y + child.y,
+        width: child.width,
+        height: child.height
+      }));
+      flattened.push(...nested);
+    } else {
+      flattened.push(rect);
+    }
+  }
+
+  return flattened;
+}
+
 function getTreemapScaleClass(share: number) {
   if (share >= 14) return "mindshare-scale-hero";
   if (share >= 7) return "mindshare-scale-large";
@@ -425,7 +463,7 @@ export function ProjectMindshareBoard({
 
   const visibleEntries = board.ranked.slice(0, MAX_VISIBLE_ITEMS);
   const treemap = useMemo(
-    () => createTreemapLayout(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
+    () => createNestedTreemap(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
     [boardSize.height, boardSize.width, visibleEntries]
   );
 
