@@ -549,17 +549,24 @@ code {
 
 .mindshare-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
 
+.mindshare-control-cluster,
+.mindshare-mode-tabs,
+.mindshare-filter-tabs,
 .mindshare-window-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.mindshare-window-tabs {
+  gap: 10px;
 }
 
 .mindshare-window-button {
@@ -571,17 +578,149 @@ code {
   box-shadow: 0 0 0 1px rgba(242, 211, 127, 0.5);
 }
 
+.mindshare-mode-button {
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(244, 247, 245, 0.72);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.mindshare-mode-button-active {
+  border-color: rgba(241, 203, 123, 0.48);
+  background: rgba(241, 203, 123, 0.14);
+  color: #fff5d8;
+}
+
 .mindshare-window-meta {
   font-size: 0.82rem;
   color: rgba(229, 231, 235, 0.72);
 }
 
+.mindshare-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mindshare-kpi-tile,
+.mindshare-side-card {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(10, 17, 14, 0.92), rgba(3, 6, 5, 0.94));
+}
+
+.mindshare-kpi-tile {
+  padding: 16px 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.mindshare-kpi-tile span,
+.mindshare-side-header span,
+.mindshare-side-copy span,
+.mindshare-side-empty,
+.mindshare-context-row span {
+  color: var(--muted-foreground);
+}
+
+.mindshare-kpi-tile strong {
+  font-size: 1.24rem;
+  letter-spacing: -0.04em;
+}
+
+.mindshare-arena {
+  display: grid;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.mindshare-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.mindshare-side-card {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.mindshare-side-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mindshare-side-header strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1rem;
+}
+
+.mindshare-side-chip {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.mindshare-side-list {
+  display: grid;
+  gap: 10px;
+}
+
+.mindshare-side-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mindshare-side-rank {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mindshare-side-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.mindshare-side-copy strong {
+  font-size: 0.92rem;
+}
+
+.mindshare-side-empty {
+  padding: 18px 14px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+}
+
 .mindshare-board {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-auto-rows: 138px;
-  gap: 6px;
-  min-height: 620px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 112px;
+  gap: 10px;
+  min-height: 700px;
 }
 
 .mindshare-tile {
@@ -589,10 +728,11 @@ code {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 14px 14px 16px;
-  border-radius: 4px;
+  padding: 16px;
+  border-radius: 24px;
   border: 1px solid rgba(242, 211, 127, 0.82);
   overflow: hidden;
+  gap: 14px;
 }
 
 .mindshare-tile::before {
@@ -606,9 +746,24 @@ code {
   clip-path: polygon(100% 0, 100% 100%, 0 0);
 }
 
-.mindshare-tile-featured {
+.mindshare-tile-hero {
+  grid-column: span 5;
+  grid-row: span 3;
+}
+
+.mindshare-tile-large {
+  grid-column: span 3;
+  grid-row: span 3;
+}
+
+.mindshare-tile-medium {
+  grid-column: span 3;
+  grid-row: span 2;
+}
+
+.mindshare-tile-small {
   grid-column: span 2;
-  grid-row: span 4;
+  grid-row: span 2;
 }
 
 .mindshare-positive {
@@ -632,6 +787,8 @@ code {
 
 .mindshare-meta {
   color: rgba(255, 255, 255, 0.92);
+  position: relative;
+  z-index: 1;
 }
 
 .mindshare-title-row {
@@ -641,26 +798,22 @@ code {
 }
 
 .mindshare-title-row strong {
-  font-size: clamp(1rem, 1.8vw, 2rem);
-  line-height: 1;
+  font-size: clamp(1rem, 1.8vw, 1.7rem);
+  line-height: 1.06;
   letter-spacing: -0.04em;
-  text-transform: uppercase;
 }
 
 .mindshare-meta > span,
-.mindshare-body span,
-.mindshare-kpis span {
+.mindshare-body span {
   font-size: 0.86rem;
   color: rgba(255, 255, 255, 0.84);
 }
 
 .mindshare-body {
   display: grid;
-  gap: 10px;
-}
-
-.mindshare-body strong {
-  font-size: 0.92rem;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
 }
 
 .mindshare-handle {
@@ -686,14 +839,12 @@ code {
   opacity: 0.72;
 }
 
-.mindshare-kpis {
-  display: grid;
-  gap: 4px;
-}
-
-.mindshare-kpis span {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.74);
+.mindshare-context-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
 }
 
 .mindshare-dot {
@@ -715,17 +866,56 @@ code {
   font-weight: 700;
 }
 
-.mindshare-spark {
-  height: 54px;
-  opacity: 0.85;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.14) 100%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.34) 0 2px,
-      transparent 2px 12px
-    );
-  clip-path: polygon(0 88%, 7% 82%, 13% 84%, 20% 70%, 28% 76%, 35% 64%, 42% 68%, 51% 52%, 58% 58%, 65% 46%, 74% 55%, 82% 34%, 90% 40%, 100% 10%, 100% 100%, 0 100%);
+.mindshare-tier-strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mindshare-tier-segment {
+  height: 100%;
+}
+
+.mindshare-tier-t4 {
+  background: #ffe28c;
+}
+
+.mindshare-tier-t3 {
+  background: #f59e0b;
+}
+
+.mindshare-tier-t2 {
+  background: #7dd3fc;
+}
+
+.mindshare-tier-t1 {
+  background: #34d399;
+}
+
+.mindshare-tier-t0 {
+  background: #a78bfa;
+}
+
+.mindshare-delta {
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.mindshare-delta-positive {
+  color: #d9ffe9;
+}
+
+.mindshare-delta-negative {
+  color: #ffd0db;
+}
+
+.mindshare-delta-neutral {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .mindshare-empty {
@@ -889,16 +1079,24 @@ code {
   .metric-grid,
   .dual-grid,
   .hero-strip,
-  .mindshare-board,
+  .mindshare-kpi-grid,
   .board-summary-grid {
     grid-template-columns: 1fr;
   }
 
+  .mindshare-arena,
   .mindshare-board {
-    grid-auto-rows: 150px;
+    grid-template-columns: 1fr;
   }
 
-  .mindshare-tile-featured {
+  .mindshare-board {
+    grid-auto-rows: 148px;
+  }
+
+  .mindshare-tile-hero,
+  .mindshare-tile-large,
+  .mindshare-tile-medium,
+  .mindshare-tile-small {
     grid-column: span 1;
     grid-row: span 2;
   }

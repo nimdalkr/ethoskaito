@@ -4,10 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { ProjectDetailPanel } from "@/components/project/project-detail-panel";
 import { ProjectHeatmap } from "@/components/project/project-heatmap";
 import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
-import { UserSummaryList } from "@/components/user/user-summary-list";
 import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { getHomePageModel } from "@/lib/data/home";
 
@@ -54,8 +52,7 @@ export default async function Page() {
                 <nav className="hero-nav-links" aria-label="Primary">
                   <a href="#mindshare-board">Mindshare</a>
                   <a href="#signal-grid">Signal Grid</a>
-                  <a href="#project-lab">Project Lab</a>
-                  <a href="#first-movers">First Movers</a>
+                  <a href="#coverage-panel">Coverage</a>
                 </nav>
               </div>
               <Button variant="secondary" className="hero-pill-button">
@@ -109,7 +106,7 @@ export default async function Page() {
         </section>
       }
     >
-      <section className="dashboard-intro stack-4">
+      <section id="coverage-panel" className="dashboard-intro stack-4">
         <FilterBar />
         <div className="metric-grid">
           <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
@@ -127,12 +124,12 @@ export default async function Page() {
         <Card variant="surface">
           <CardHeader className="card-header-split">
             <div className="stack-3">
-              <CardTitle>Mindshare board</CardTitle>
+              <CardTitle>Mindshare arena</CardTitle>
               <p className="muted-copy compact-copy">
-                Weighted attention by project, ranked by live mention share, trust-tier participation, and outcome pressure.
+                Weighted project attention from the Ethos user cohort, split by time window, momentum mode, and trust-tier cohort.
               </p>
             </div>
-            <Badge tone="accent">Top live projects</Badge>
+            <Badge tone="accent">Treemap + gainers + losers</Badge>
           </CardHeader>
           <CardContent className="stack-3">
             <ProjectMindshareBoard projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
@@ -172,40 +169,6 @@ export default async function Page() {
           </CardHeader>
           <CardContent>
             <ProjectHeatmap projects={model.projects} tierRollups={model.tierRollups} />
-          </CardContent>
-        </Card>
-      </section>
-
-      <section id="project-lab" className="stack-4">
-        <ProjectDetailPanel projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
-      </section>
-
-      <section id="first-movers" className="dual-grid dual-grid-even">
-        <Card variant="surface">
-          <CardHeader>
-            <CardTitle>First movers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <UserSummaryList users={model.users} mentions={model.mentions} />
-          </CardContent>
-        </Card>
-        <Card variant="surface">
-          <CardHeader>
-            <CardTitle>Validation pressure</CardTitle>
-          </CardHeader>
-          <CardContent className="stack-3">
-            <div className="panel-line">
-              <span>Tracked accounts</span>
-              <strong>{model.totalTrackedAccounts}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Current first-call density</span>
-              <strong>{model.projects.length > 0 ? `${Math.round((firstMentions.length / model.projects.length) * 100)}%` : "0%"}</strong>
-            </div>
-            <div className="panel-line">
-              <span>Collector mode</span>
-              <strong>Main + repair + hot lane</strong>
-            </div>
           </CardContent>
         </Card>
       </section>
