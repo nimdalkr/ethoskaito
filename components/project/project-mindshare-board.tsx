@@ -694,7 +694,7 @@ export function ProjectMindshareBoard({
     }
 
     const regular = visibleEntries.filter((entry) => !entry.isOthers);
-    return [...regular.slice(0, 5), others, ...regular.slice(5)];
+    return [...regular.slice(0, 12), others, ...regular.slice(12)];
   }, [visibleEntries]);
   const layout = useMemo(() => createMindshareMosaic(arrangedEntries.map((entry) => ({ item: entry, value: entry.share })), boardWidth), [arrangedEntries, boardWidth]);
   const boardHeight = Math.max(layout.height, boardWidth >= 1240 ? 640 : boardWidth >= 980 ? 700 : boardWidth >= 720 ? 820 : 920);
