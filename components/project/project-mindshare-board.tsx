@@ -173,18 +173,13 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
 
 function splitBalancedGroups<T>(items: Array<{ item: T; value: number }>, groupCount: number) {
   const groups = Array.from({ length: groupCount }, () => [] as Array<{ item: T; value: number }>);
-  const totals = Array.from({ length: groupCount }, () => 0);
+  const targetSize = Math.ceil(items.length / groupCount);
+  let index = 0;
 
   for (const item of items) {
-    let targetIndex = 0;
-    for (let index = 1; index < groupCount; index += 1) {
-      if (totals[index] < totals[targetIndex]) {
-        targetIndex = index;
-      }
-    }
-
-    groups[targetIndex].push(item);
-    totals[targetIndex] += item.value;
+    const groupIndex = Math.min(Math.floor(index / targetSize), groupCount - 1);
+    groups[groupIndex].push(item);
+    index += 1;
   }
 
   return groups.filter((group) => group.length > 0);
