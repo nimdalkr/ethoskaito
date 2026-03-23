@@ -171,6 +171,25 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
   return placed;
 }
 
+function splitBalancedGroups<T>(items: Array<{ item: T; value: number }>, groupCount: number) {
+  const groups = Array.from({ length: groupCount }, () => [] as Array<{ item: T; value: number }>);
+  const totals = Array.from({ length: groupCount }, () => 0);
+
+  for (const item of items) {
+    let targetIndex = 0;
+    for (let index = 1; index < groupCount; index += 1) {
+      if (totals[index] < totals[targetIndex]) {
+        targetIndex = index;
+      }
+    }
+
+    groups[targetIndex].push(item);
+    totals[targetIndex] += item.value;
+  }
+
+  return groups.filter((group) => group.length > 0);
+}
+
 function createNestedTreemap<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100, leaderCount = 4) {
   if (items.length <= leaderCount + 1) {
     return createTreemapLayout(items, width, height);
@@ -178,12 +197,15 @@ function createNestedTreemap<T>(items: Array<{ item: T; value: number }>, width 
 
   const leaders = items.slice(0, leaderCount);
   const tail = items.slice(leaderCount);
-  const tailValue = sumValues(tail);
+  const tailGroups = splitBalancedGroups(tail, Math.min(3, Math.max(2, Math.ceil(tail.length / 4))));
 
   const grouped = createTreemapLayout(
     [
       ...leaders,
-      { item: null as T, value: tailValue }
+      ...tailGroups.map((group, index) => ({
+        item: ({ __tailGroup: index } as T),
+        value: sumValues(group)
+      }))
     ],
     width,
     height
@@ -192,8 +214,9 @@ function createNestedTreemap<T>(items: Array<{ item: T; value: number }>, width 
   const flattened: TreemapRect<T>[] = [];
 
   for (const rect of grouped) {
-    if (rect.item === null) {
-      const nested = createTreemapLayout(tail, rect.width, rect.height).map((child) => ({
+    const tailGroupIndex = typeof rect.item === "object" && rect.item !== null && "__tailGroup" in rect.item ? Number(rect.item.__tailGroup) : null;
+    if (tailGroupIndex !== null) {
+      const nested = createTreemapLayout(tailGroups[tailGroupIndex], rect.width, rect.height).map((child) => ({
         item: child.item,
         x: rect.x + child.x,
         y: rect.y + child.y,
