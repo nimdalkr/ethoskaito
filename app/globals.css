@@ -731,12 +731,12 @@ code {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 16px;
   border-radius: 18px;
   border: 1px solid rgba(242, 211, 127, 0.74);
   overflow: hidden;
-  gap: 14px;
+  gap: 12px;
 }
 
 .mindshare-tile::before {
@@ -807,6 +807,15 @@ code {
   letter-spacing: -0.04em;
   max-width: 92%;
   text-wrap: balance;
+}
+
+.mindshare-share {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(1.1rem, 2vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .mindshare-meta > span,
@@ -886,6 +895,18 @@ code {
     );
   clip-path: polygon(0 86%, 6% 80%, 13% 82%, 19% 70%, 25% 76%, 33% 60%, 40% 66%, 47% 48%, 55% 52%, 63% 40%, 71% 50%, 80% 32%, 88% 38%, 100% 12%, 100% 100%, 0 100%);
   pointer-events: none;
+}
+
+.mindshare-tile-hero .mindshare-share {
+  font-size: clamp(1.6rem, 2.9vw, 3rem);
+}
+
+.mindshare-tile-large .mindshare-share {
+  font-size: clamp(1.35rem, 2.3vw, 2.3rem);
+}
+
+.mindshare-tile-small .mindshare-share {
+  font-size: clamp(1rem, 1.3vw, 1.35rem);
 }
 
 .mindshare-tier-strip {

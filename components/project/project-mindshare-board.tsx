@@ -51,16 +51,16 @@ function formatDelta(value: number, mode: MindshareMode) {
   return `${rounded > 0 ? "+" : ""}${rounded}`;
 }
 
-function getTileSize(index: number) {
-  if (index === 0) {
+function getTileSize(share: number, index: number) {
+  if (index === 0 || share >= 14) {
     return "mindshare-tile-hero";
   }
 
-  if (index < 3) {
+  if (share >= 8) {
     return "mindshare-tile-large";
   }
 
-  if (index < 7) {
+  if (share >= 4) {
     return "mindshare-tile-medium";
   }
 
@@ -210,7 +210,7 @@ export function ProjectMindshareBoard({
     );
   }
 
-  const tiles = board.ranked.slice(0, 15);
+  const tiles = board.ranked.slice(0, 20);
 
   return (
     <div className="mindshare-stack">
@@ -337,7 +337,7 @@ export function ProjectMindshareBoard({
           {tiles.map((entry, index) => {
             const momentumValue = mode === "absolute" ? entry.deltaAbsolute : entry.deltaRelative;
             const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-            const tileClass = `mindshare-tile ${getTileSize(index)} ${tone}`;
+            const tileClass = `mindshare-tile ${getTileSize(entry.share, index)} ${tone}`;
 
             return (
               <article key={entry.project.id} className={tileClass}>
@@ -348,6 +348,7 @@ export function ProjectMindshareBoard({
                   </div>
                 </div>
 
+                <div className="mindshare-share">{formatShare(entry.share)}</div>
                 <div className="mindshare-wave" aria-hidden="true" />
                 <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
               </article>
