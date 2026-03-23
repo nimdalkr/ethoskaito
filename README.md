@@ -12,6 +12,7 @@ Tier-aware analytics dashboard that combines:
 - Prisma + PostgreSQL
 - TypeScript
 - Vitest
+- Playwright
 
 ## Environment
 
@@ -39,7 +40,14 @@ npm install
 npm run prisma:generate
 npm run typecheck
 npm test
+npm run test:e2e
 npm run dev
+```
+
+Install the Playwright browser once on a fresh machine:
+
+```bash
+npm run test:e2e:install
 ```
 
 ## Key Routes

@@ -6,6 +6,9 @@ coverage
 dist
 generated
 *.tsbuildinfo
+playwright-report
+test-results
+blob-report
 
 .vercel
 .env*.local
