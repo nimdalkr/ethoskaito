@@ -603,6 +603,22 @@ code {
   color: rgba(229, 231, 235, 0.72);
 }
 
+.mindshare-context-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 2px 2px 4px;
+  color: rgba(244, 247, 245, 0.64);
+  font-size: 0.82rem;
+}
+
+.mindshare-context-row strong {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
 .mindshare-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -637,7 +653,7 @@ code {
 
 .mindshare-arena {
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -648,7 +664,7 @@ code {
 }
 
 .mindshare-side-card {
-  padding: 14px 14px 16px;
+  padding: 12px 12px 14px;
   display: grid;
   gap: 12px;
 }
@@ -681,32 +697,6 @@ code {
   gap: 8px;
 }
 
-.mindshare-side-row {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.mindshare-side-rank {
-  color: rgba(255, 255, 255, 0.46);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.mindshare-side-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.mindshare-side-copy strong {
-  font-size: 0.92rem;
-}
-
 .mindshare-side-empty {
   padding: 18px 14px;
   border-radius: 18px;
@@ -715,9 +705,50 @@ code {
   text-align: center;
 }
 
+.mindshare-leaderboard {
+  display: grid;
+  gap: 6px;
+}
+
+.mindshare-leaderboard-head,
+.mindshare-leaderboard-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(5, minmax(48px, 0.52fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.mindshare-leaderboard-head {
+  padding: 4px 8px 8px;
+  color: rgba(244, 247, 245, 0.54);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mindshare-leaderboard-row {
+  padding: 9px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.mindshare-leaderboard-row strong,
+.mindshare-leaderboard-row span {
+  font-size: 0.78rem;
+}
+
+.mindshare-leaderboard-row strong:first-child {
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mindshare-board {
   position: relative;
-  height: clamp(620px, 60vw, 860px);
+  height: clamp(660px, 62vw, 900px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.015);
@@ -736,7 +767,7 @@ code {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: 16px;
+  padding: 16px 16px 14px;
   border-radius: 18px;
   border: 1px solid rgba(242, 211, 127, 0.74);
   overflow: hidden;
@@ -796,54 +827,10 @@ code {
 .mindshare-share {
   position: relative;
   z-index: 1;
-  font-size: clamp(1.1rem, 2vw, 2rem);
+  font-size: clamp(1.2rem, 2vw, 2.2rem);
   font-weight: 700;
   letter-spacing: -0.05em;
   color: rgba(255, 255, 255, 0.96);
-}
-
-.mindshare-meta > span,
-.mindshare-body span {
-  font-size: 0.86rem;
-  color: rgba(255, 255, 255, 0.84);
-}
-
-.mindshare-body {
-  display: grid;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-
-.mindshare-handle {
-  opacity: 0.82;
-}
-
-.mindshare-primary-metric {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.mindshare-primary-metric strong {
-  font-size: clamp(1.3rem, 2vw, 2.4rem);
-  line-height: 0.9;
-  letter-spacing: -0.05em;
-}
-
-.mindshare-primary-metric span {
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  opacity: 0.72;
-}
-
-.mindshare-context-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 0.82rem;
 }
 
 .mindshare-dot {
@@ -865,20 +852,34 @@ code {
   font-weight: 700;
 }
 
-.mindshare-wave {
+.mindshare-footer-tag {
   position: absolute;
-  inset: auto 14px 12px 14px;
+  left: 12px;
+  bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 244, 218, 0.9);
+  color: #6f4d18;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.mindshare-sparkline {
+  position: absolute;
+  inset: auto 16px 14px 16px;
   height: 34%;
-  opacity: 0.38;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 24%, rgba(255, 255, 255, 0.1) 100%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.26) 0 2px,
-      transparent 2px 10px
-    );
-  clip-path: polygon(0 86%, 6% 80%, 13% 82%, 19% 70%, 25% 76%, 33% 60%, 40% 66%, 47% 48%, 55% 52%, 63% 40%, 71% 50%, 80% 32%, 88% 38%, 100% 12%, 100% 100%, 0 100%);
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  opacity: 0.5;
   pointer-events: none;
+}
+
+.mindshare-spark-bar {
+  flex: 1 1 0;
+  min-height: 8%;
+  border-radius: 999px 999px 0 0;
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .mindshare-scale-hero .mindshare-share {
@@ -1119,13 +1120,21 @@ code {
     grid-template-columns: 1fr;
   }
 
-  .mindshare-arena,
-  .mindshare-board {
+  .mindshare-arena {
     grid-template-columns: 1fr;
+  }
+
+   .mindshare-context-row {
+    gap: 10px;
   }
 
   .mindshare-board {
     height: 960px;
+  }
+
+  .mindshare-leaderboard-head,
+  .mindshare-leaderboard-row {
+    grid-template-columns: minmax(0, 1.4fr) repeat(5, minmax(48px, 0.6fr));
   }
 }
 

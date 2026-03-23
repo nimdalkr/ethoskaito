@@ -16,9 +16,6 @@ export default async function Page() {
   const totalWeightedMentions = model.tierRollups.reduce((sum, row) => sum + row.weightedMentions, 0);
   const validatedProjects = model.outcomes.filter((outcome) => (outcome.return7d ?? 0) > 0).length;
   const firstMentions = model.mentions.filter((mention) => mention.isFirstTrackedMention);
-  const topTierWeight = model.tierRollups
-    .filter((row) => row.tier === "T4")
-    .reduce((sum, row) => sum + row.weightedMentions, 0);
   const topProject = [...model.projects]
     .map((project) => ({
       project,
@@ -126,32 +123,13 @@ export default async function Page() {
             <div className="stack-3">
               <CardTitle>Mindshare arena</CardTitle>
               <p className="muted-copy compact-copy">
-                Weighted project attention from the Ethos user cohort, split by time window, momentum mode, and trust-tier cohort.
+                Weighted project attention from the Ethos cohort, with Kaito-style movers on the left and a live share treemap on the right.
               </p>
             </div>
-            <Badge tone="accent">Treemap + gainers + losers</Badge>
+            <Badge tone="accent">Live cohort mindshare</Badge>
           </CardHeader>
           <CardContent className="stack-3">
             <ProjectMindshareBoard projects={model.projects} mentions={model.mentions} />
-            <div className="board-summary-grid">
-              <div className="panel-line">
-                <span>First tracked mentions</span>
-                <strong>{firstMentions.length}</strong>
-              </div>
-              <div className="panel-line">
-                <span>Top tier weight share</span>
-                <strong>
-                  {getTrustTierLabel("T4")}{" "}
-                  {totalWeightedMentions > 0 ? `${Math.round((topTierWeight / totalWeightedMentions) * 100)}%` : "0%"}
-                </strong>
-              </div>
-              <div className="panel-line">
-                <span>Positive outcome match</span>
-                <strong>
-                  {validatedProjects} / {model.outcomes.length}
-                </strong>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </section>
