@@ -132,7 +132,7 @@ export default async function Page() {
             <Badge tone="accent">Treemap + gainers + losers</Badge>
           </CardHeader>
           <CardContent className="stack-3">
-            <ProjectMindshareBoard projects={model.projects} outcomes={model.outcomes} mentions={model.mentions} />
+            <ProjectMindshareBoard projects={model.projects} mentions={model.mentions} />
             <div className="board-summary-grid">
               <div className="panel-line">
                 <span>First tracked mentions</span>

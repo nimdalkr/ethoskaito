@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { getTrustTierLabel, getTrustTierRank } from "@/lib/analytics/tier";
-import type { ProjectMention, ProjectOutcome, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
+import { getTrustTierRank } from "@/lib/analytics/tier";
+import type { ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
 
 type MindshareWindow = "1d" | "7d" | "30d" | "90d";
 type MindshareMode = "absolute" | "relative";
@@ -27,14 +27,11 @@ const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: Trus
 
 type ProjectStats = {
   project: ProjectSnapshot;
-  outcome: ProjectOutcome | undefined;
   weighted: number;
   previousWeighted: number;
-  mentions: number;
   authors: Set<string>;
   tierWeights: Record<TrustTier, number>;
   highTierWeight: number;
-  leadTier: TrustTier;
 };
 
 function formatShare(value: number) {
@@ -52,23 +49,6 @@ function formatDelta(value: number, mode: MindshareMode) {
 
   const rounded = value > 0 ? Math.round(value) : Math.round(value);
   return `${rounded > 0 ? "+" : ""}${rounded}`;
-}
-
-function getTierContributionLabel(stats: ProjectStats) {
-  const total = Object.values(stats.tierWeights).reduce((sum, value) => sum + value, 0);
-  if (total <= 0) {
-    return "No tier split";
-  }
-
-  const dominantTier = (Object.entries(stats.tierWeights) as Array<[TrustTier, number]>).sort((left, right) => {
-    if (right[1] !== left[1]) {
-      return right[1] - left[1];
-    }
-
-    return getTrustTierRank(right[0]) - getTrustTierRank(left[0]);
-  })[0]?.[0];
-
-  return dominantTier ? `${getTrustTierLabel(dominantTier)} led` : "No tier split";
 }
 
 function getTileSize(index: number) {
@@ -89,11 +69,9 @@ function getTileSize(index: number) {
 
 export function ProjectMindshareBoard({
   projects,
-  outcomes,
   mentions
 }: {
   projects: ProjectSnapshot[];
-  outcomes: ProjectOutcome[];
   mentions: ProjectMention[];
 }) {
   const [windowKey, setWindowKey] = useState<MindshareWindow>("7d");
@@ -109,7 +87,6 @@ export function ProjectMindshareBoard({
     const previousStart = now - selectedWindow.days * 2 * 24 * 60 * 60 * 1000;
     const allowedTiers = selectedTierFilter.tiers ? new Set(selectedTierFilter.tiers) : null;
     const projectMap = new Map(projects.map((project) => [project.id, project]));
-    const outcomeMap = new Map(outcomes.map((outcome) => [outcome.projectId, outcome]));
     const statsMap = new Map<string, ProjectStats>();
 
     for (const mention of mentions) {
@@ -131,19 +108,15 @@ export function ProjectMindshareBoard({
         statsMap.get(mention.projectId) ??
         {
           project,
-          outcome: outcomeMap.get(mention.projectId),
           weighted: 0,
           previousWeighted: 0,
-          mentions: 0,
           authors: new Set<string>(),
           tierWeights: { T0: 0, T1: 0, T2: 0, T3: 0, T4: 0 },
-          highTierWeight: 0,
-          leadTier: "T1" as TrustTier
+          highTierWeight: 0
         };
 
       if (mentionedAt >= currentStart) {
         entry.weighted += mention.weight;
-        entry.mentions += 1;
         entry.authors.add(mention.authorUserkey);
         entry.tierWeights[mention.authorTier] += mention.weight;
         if (mention.authorTier === "T4" || mention.authorTier === "T3") {
@@ -165,20 +138,11 @@ export function ProjectMindshareBoard({
         const deltaRelative =
           entry.previousWeighted > 0 ? ((entry.weighted - entry.previousWeighted) / entry.previousWeighted) * 100 : entry.weighted > 0 ? 100 : 0;
 
-        const leadTier = (Object.entries(entry.tierWeights) as Array<[TrustTier, number]>).sort((left, right) => {
-          if (right[1] !== left[1]) {
-            return right[1] - left[1];
-          }
-
-          return getTrustTierRank(right[0]) - getTrustTierRank(left[0]);
-        })[0]?.[0] ?? "T1";
-
         return {
           ...entry,
           share,
           deltaAbsolute,
           deltaRelative,
-          leadTier,
           highTierShare: entry.weighted > 0 ? (entry.highTierWeight / entry.weighted) * 100 : 0
         };
       })
@@ -219,7 +183,7 @@ export function ProjectMindshareBoard({
       totalAuthors,
       highTierShare
     };
-  }, [mentions, mode, outcomes, projects, selectedTierFilter.tiers, selectedWindow.days]);
+  }, [mentions, mode, projects, selectedTierFilter.tiers, selectedWindow.days]);
 
   if (board.ranked.length === 0) {
     return (
@@ -371,12 +335,8 @@ export function ProjectMindshareBoard({
 
         <div className="mindshare-board">
           {tiles.map((entry, index) => {
-            const tone =
-              entry.outcome?.return7d && entry.outcome.return7d > 0
-                ? "mindshare-positive"
-                : entry.outcome?.return7d && entry.outcome.return7d < 0
-                  ? "mindshare-negative"
-                  : "mindshare-neutral";
+            const momentumValue = mode === "absolute" ? entry.deltaAbsolute : entry.deltaRelative;
+            const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
             const tileClass = `mindshare-tile ${getTileSize(index)} ${tone}`;
 
             return (
@@ -388,6 +348,7 @@ export function ProjectMindshareBoard({
                   </div>
                 </div>
 
+                <div className="mindshare-wave" aria-hidden="true" />
                 <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
               </article>
             );
