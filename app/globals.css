@@ -716,19 +716,22 @@ code {
 }
 
 .mindshare-board {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: 108px;
-  grid-auto-flow: dense;
-  gap: 8px;
-  min-height: 700px;
-  padding: 4px;
+  position: relative;
+  height: clamp(620px, 60vw, 860px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.015);
+  overflow: hidden;
+}
+
+.mindshare-tile-shell {
+  position: absolute;
+  padding: 4px;
 }
 
 .mindshare-tile {
+  width: 100%;
+  height: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -749,31 +752,6 @@ code {
   height: 34%;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0));
   clip-path: polygon(100% 0, 100% 100%, 0 0);
-}
-
-.mindshare-tile-hero {
-  grid-column: span 4;
-  grid-row: span 3;
-}
-
-.mindshare-tile-large {
-  grid-column: span 3;
-  grid-row: span 2;
-}
-
-.mindshare-tile-medium {
-  grid-column: span 3;
-  grid-row: span 2;
-}
-
-.mindshare-tile-small {
-  grid-column: span 2;
-  grid-row: span 2;
-}
-
-.mindshare-tile-wide {
-  grid-column: span 4;
-  grid-row: span 2;
 }
 
 .mindshare-positive {
@@ -903,20 +881,24 @@ code {
   pointer-events: none;
 }
 
-.mindshare-tile-hero .mindshare-share {
+.mindshare-scale-hero .mindshare-share {
   font-size: clamp(1.6rem, 2.9vw, 3rem);
 }
 
-.mindshare-tile-large .mindshare-share {
+.mindshare-scale-large .mindshare-share {
   font-size: clamp(1.35rem, 2.3vw, 2.3rem);
 }
 
-.mindshare-tile-wide .mindshare-share {
-  font-size: clamp(1.2rem, 1.9vw, 1.9rem);
+.mindshare-scale-medium .mindshare-share {
+  font-size: clamp(1.1rem, 1.8vw, 1.7rem);
 }
 
-.mindshare-tile-small .mindshare-share {
+.mindshare-scale-small .mindshare-share {
   font-size: clamp(1rem, 1.3vw, 1.35rem);
+}
+
+.mindshare-scale-small .mindshare-title-row strong {
+  font-size: clamp(0.84rem, 1.1vw, 1rem);
 }
 
 .mindshare-tier-strip {
@@ -1143,16 +1125,7 @@ code {
   }
 
   .mindshare-board {
-    grid-auto-rows: 144px;
-  }
-
-  .mindshare-tile-hero,
-  .mindshare-tile-large,
-  .mindshare-tile-medium,
-  .mindshare-tile-small,
-  .mindshare-tile-wide {
-    grid-column: span 1;
-    grid-row: span 2;
+    height: 960px;
   }
 }
 

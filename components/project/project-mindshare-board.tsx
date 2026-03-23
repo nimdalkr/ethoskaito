@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { getTrustTierRank } from "@/lib/analytics/tier";
 import type { ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
 
 type MindshareWindow = "1d" | "7d" | "30d" | "90d";
@@ -51,31 +50,138 @@ function formatDelta(value: number, mode: MindshareMode) {
   return `${rounded > 0 ? "+" : ""}${rounded}`;
 }
 
-const TILE_LAYOUT_PATTERN = [
-  "mindshare-tile-hero",
-  "mindshare-tile-hero",
-  "mindshare-tile-hero",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-medium",
-  "mindshare-tile-small",
-  "mindshare-tile-small",
-  "mindshare-tile-small",
-  "mindshare-tile-small",
-  "mindshare-tile-small",
-  "mindshare-tile-small",
-  "mindshare-tile-wide",
-  "mindshare-tile-wide",
-  "mindshare-tile-wide"
-] as const;
+type TreemapRect<T> = {
+  item: T;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
-function getTileSize(index: number) {
-  return TILE_LAYOUT_PATTERN[index] ?? "mindshare-tile-small";
+type TreemapItem<T> = {
+  item: T;
+  area: number;
+};
+
+function sumAreas<T>(items: TreemapItem<T>[]) {
+  return items.reduce((sum, item) => sum + item.area, 0);
+}
+
+function worstAspectRatio<T>(row: TreemapItem<T>[], shortSide: number) {
+  if (row.length === 0 || shortSide <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const total = sumAreas(row);
+  const max = Math.max(...row.map((item) => item.area));
+  const min = Math.min(...row.map((item) => item.area));
+
+  return Math.max((shortSide * shortSide * max) / (total * total), (total * total) / (shortSide * shortSide * min));
+}
+
+function layoutTreemapRow<T>(
+  row: TreemapItem<T>[],
+  rect: { x: number; y: number; width: number; height: number }
+): { placed: TreemapRect<T>[]; remaining: { x: number; y: number; width: number; height: number } } {
+  const total = sumAreas(row);
+
+  if (rect.width >= rect.height) {
+    const rowHeight = total / rect.width;
+    let x = rect.x;
+    const placed = row.map((entry) => {
+      const width = entry.area / rowHeight;
+      const next = { item: entry.item, x, y: rect.y, width, height: rowHeight };
+      x += width;
+      return next;
+    });
+
+    return {
+      placed,
+      remaining: {
+        x: rect.x,
+        y: rect.y + rowHeight,
+        width: rect.width,
+        height: rect.height - rowHeight
+      }
+    };
+  }
+
+  const rowWidth = total / rect.height;
+  let y = rect.y;
+  const placed = row.map((entry) => {
+    const height = entry.area / rowWidth;
+    const next = { item: entry.item, x: rect.x, y, width: rowWidth, height };
+    y += height;
+    return next;
+  });
+
+  return {
+    placed,
+    remaining: {
+      x: rect.x + rowWidth,
+      y: rect.y,
+      width: rect.width - rowWidth,
+      height: rect.height
+    }
+  };
+}
+
+function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100) {
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  if (total <= 0) {
+    return [] as TreemapRect<T>[];
+  }
+
+  const scale = (width * height) / total;
+  const remainingItems: TreemapItem<T>[] = items
+    .filter((item) => item.value > 0)
+    .sort((left, right) => right.value - left.value)
+    .map((item) => ({ item: item.item, area: item.value * scale }));
+
+  const placed: TreemapRect<T>[] = [];
+  let row: TreemapItem<T>[] = [];
+  let rect = { x: 0, y: 0, width, height };
+
+  while (remainingItems.length > 0 && rect.width > 0 && rect.height > 0) {
+    const candidate = remainingItems[0];
+    const shortSide = Math.min(rect.width, rect.height);
+    const candidateRatio = worstAspectRatio([...row, candidate], shortSide);
+    const currentRatio = worstAspectRatio(row, shortSide);
+
+    if (row.length === 0 || candidateRatio <= currentRatio) {
+      row.push(candidate);
+      remainingItems.shift();
+      continue;
+    }
+
+    const next = layoutTreemapRow(row, rect);
+    placed.push(...next.placed);
+    rect = next.remaining;
+    row = [];
+  }
+
+  if (row.length > 0 && rect.width > 0 && rect.height > 0) {
+    const next = layoutTreemapRow(row, rect);
+    placed.push(...next.placed);
+  }
+
+  return placed;
+}
+
+function getTreemapScaleClass(share: number) {
+  if (share >= 14) {
+    return "mindshare-scale-hero";
+  }
+
+  if (share >= 7) {
+    return "mindshare-scale-large";
+  }
+
+  if (share >= 3) {
+    return "mindshare-scale-medium";
+  }
+
+  return "mindshare-scale-small";
 }
 
 export function ProjectMindshareBoard({
@@ -140,10 +246,10 @@ export function ProjectMindshareBoard({
       statsMap.set(mention.projectId, entry);
     }
 
+    const shareDenominator = [...statsMap.values()].reduce((sum, item) => sum + item.weighted, 0);
     const ranked = [...statsMap.values()]
       .filter((entry) => entry.weighted > 0)
       .map((entry) => {
-        const shareDenominator = [...statsMap.values()].reduce((sum, item) => sum + item.weighted, 0);
         const share = shareDenominator > 0 ? (entry.weighted / shareDenominator) * 100 : 0;
         const deltaAbsolute = entry.weighted - entry.previousWeighted;
         const deltaRelative =
@@ -222,6 +328,7 @@ export function ProjectMindshareBoard({
   }
 
   const tiles = board.ranked.slice(0, 20);
+  const treemap = useMemo(() => createTreemapLayout(tiles.map((entry) => ({ item: entry, value: entry.share }))), [tiles]);
 
   return (
     <div className="mindshare-stack">
@@ -345,24 +452,35 @@ export function ProjectMindshareBoard({
         </aside>
 
         <div className="mindshare-board">
-          {tiles.map((entry, index) => {
+          {treemap.map(({ item: entry, x, y, width, height }) => {
             const momentumValue = mode === "absolute" ? entry.deltaAbsolute : entry.deltaRelative;
             const tone = momentumValue > 0 ? "mindshare-positive" : momentumValue < 0 ? "mindshare-negative" : "mindshare-neutral";
-            const tileClass = `mindshare-tile ${getTileSize(index)} ${tone}`;
+            const tileClass = `mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)}`;
 
             return (
-              <article key={entry.project.id} className={tileClass}>
-                <div className="mindshare-meta">
-                  <div className="mindshare-title-row">
-                    <div className="mindshare-dot" />
-                    <strong>{entry.project.name}</strong>
+              <div
+                key={entry.project.id}
+                className="mindshare-tile-shell"
+                style={{
+                  left: `${x}%`,
+                  top: `${y}%`,
+                  width: `${width}%`,
+                  height: `${height}%`
+                }}
+              >
+                <article className={tileClass}>
+                  <div className="mindshare-meta">
+                    <div className="mindshare-title-row">
+                      <div className="mindshare-dot" />
+                      <strong>{entry.project.name}</strong>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mindshare-share">{formatShare(entry.share)}</div>
-                <div className="mindshare-wave" aria-hidden="true" />
-                <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
-              </article>
+                  <div className="mindshare-share">{formatShare(entry.share)}</div>
+                  <div className="mindshare-wave" aria-hidden="true" />
+                  <div className="mindshare-corner">{Math.round(entry.highTierShare)}% high-tier</div>
+                </article>
+              </div>
             );
           })}
         </div>
