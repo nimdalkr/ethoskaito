@@ -490,7 +490,7 @@ function getLayoutValue(entries: RankedEntry[], entry: RankedEntry) {
   const regular = entries.filter((item) => !item.isOthers);
   const anchorA = regular[4]?.share ?? regular[regular.length - 1]?.share ?? entry.share;
   const anchorB = regular[5]?.share ?? anchorA;
-  const cap = Math.max(anchorA * 1.55, anchorB * 1.8, 6.2);
+  const cap = Math.max(anchorA * 1.18, anchorB * 1.28, 4.8);
   return Math.min(entry.share, cap);
 }
 
