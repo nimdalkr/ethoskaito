@@ -45,8 +45,13 @@ type TreemapRect<T> = {
 };
 
 type PackedMindshareLayout<T> = {
-  rects: TreemapRect<T>[];
-  height: number;
+  tiles: Array<{
+    item: T;
+    colSpan: number;
+    rowSpan: number;
+  }>;
+  columns: number;
+  rowHeight: number;
 };
 
 const WINDOW_OPTIONS: Array<{ key: MindshareWindow; label: string; days: WindowDays }> = [
@@ -179,162 +184,43 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
 
 function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, width = 1000): PackedMindshareLayout<T> {
   if (items.length === 0 || width <= 0) {
-    return { rects: [], height: 0 };
+    return { tiles: [], columns: 12, rowHeight: 72 };
   }
 
-  const columns = width >= 1440 ? 14 : width >= 1240 ? 12 : width >= 980 ? 10 : width >= 720 ? 8 : 6;
-  const nominalCells = Math.max(items.length * 5, columns * 6);
-  const totalValue = sumValues(items);
-  const occupied = new Set<string>();
-  const minimumArea = 4;
-  const minimumSide = 2;
-  const palette = [
-    { w: 2, h: 2 },
-    { w: 2, h: 3 },
-    { w: 3, h: 2 },
-    { w: 3, h: 3 },
-    { w: 3, h: 4 },
-    { w: 4, h: 3 },
-    { w: 4, h: 4 },
-    { w: 4, h: 5 },
-    { w: 5, h: 4 },
-    { w: 5, h: 5 },
-    { w: 5, h: 6 },
-    { w: 6, h: 5 },
-    { w: 6, h: 6 },
-    { w: 7, h: 6 }
-  ];
+  const columns = width >= 1440 ? 12 : width >= 1180 ? 10 : width >= 920 ? 8 : width >= 720 ? 6 : 4;
+  const rowHeight = Math.max(72, Math.round((width / columns) * 0.78));
 
-  const chooseDimensions = (targetArea: number) => {
-    const candidates: Array<{ w: number; h: number; area: number; score: number }> = [];
-
-    for (const shape of palette) {
-      if (shape.w > columns) {
-        continue;
-      }
-
-      const area = shape.w * shape.h;
-      const ratio = shape.w / shape.h;
-      if (ratio < 0.66 || ratio > 1.5) {
-        continue;
-      }
-
-      const score = Math.abs(area - targetArea) * 1.5 + Math.abs(shape.w - shape.h) * 1.6 + Math.max(0, area - targetArea) * 0.5;
-      candidates.push({ w: shape.w, h: shape.h, area, score });
+  const chooseSpan = (value: number, index: number) => {
+    if (index === 0) {
+      return columns >= 10 ? { colSpan: 3, rowSpan: 4 } : { colSpan: 2, rowSpan: 4 };
     }
 
-    candidates.sort((left, right) => left.score - right.score || left.area - right.area);
-    return candidates.length > 0 ? candidates : [{ w: minimumSide, h: Math.max(minimumSide, Math.ceil(targetArea / minimumSide)), area: targetArea, score: 999 }];
+    if (index === 1 || index === 2) {
+      return columns >= 10 ? { colSpan: 3, rowSpan: 3 } : { colSpan: 2, rowSpan: 3 };
+    }
+
+    if (value >= 5) {
+      return columns >= 10 ? { colSpan: 2, rowSpan: 3 } : { colSpan: 2, rowSpan: 2 };
+    }
+
+    if (value >= 3.2) {
+      return { colSpan: 2, rowSpan: 2 };
+    }
+
+    if (value >= 2) {
+      return columns >= 8 ? { colSpan: 2, rowSpan: 2 } : { colSpan: 2, rowSpan: 2 };
+    }
+
+    return columns >= 8 ? { colSpan: 2, rowSpan: 2 } : { colSpan: 2, rowSpan: 2 };
   };
-
-  const canPlace = (x: number, y: number, w: number, h: number) => {
-    if (x + w > columns) {
-      return false;
-    }
-
-    for (let row = y; row < y + h; row += 1) {
-      for (let col = x; col < x + w; col += 1) {
-        if (occupied.has(`${col}:${row}`)) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  };
-
-  const markPlaced = (x: number, y: number, w: number, h: number) => {
-    for (let row = y; row < y + h; row += 1) {
-      for (let col = x; col < x + w; col += 1) {
-        occupied.add(`${col}:${row}`);
-      }
-    }
-  };
-
-  const placements: Array<TreemapRect<T> & { cellsWide: number; cellsHigh: number }> = [];
-
-  for (const entry of items) {
-    const targetArea = Math.max(minimumArea, Math.round((entry.value / totalValue) * nominalCells));
-    const candidates = chooseDimensions(targetArea);
-    let placed = false;
-
-    for (const candidate of candidates) {
-      for (let y = 0; y < 64 && !placed; y += 1) {
-        for (let x = 0; x <= columns - candidate.w && !placed; x += 1) {
-          if (!canPlace(x, y, candidate.w, candidate.h)) {
-            continue;
-          }
-
-          markPlaced(x, y, candidate.w, candidate.h);
-          placements.push({
-            item: entry.item,
-            x,
-            y,
-            width: candidate.w,
-            height: candidate.h,
-            cellsWide: candidate.w,
-            cellsHigh: candidate.h
-          });
-          placed = true;
-        }
-      }
-
-      if (placed) {
-        break;
-      }
-    }
-  }
-
-  const hasCollisionAt = (candidate: { x: number; y: number; cellsWide: number; cellsHigh: number }, ignoreIndex: number) => {
-    return placements.some((placedRect, index) => {
-      if (index === ignoreIndex) {
-        return false;
-      }
-
-      return !(
-        candidate.x + candidate.cellsWide <= placedRect.x ||
-        placedRect.x + placedRect.cellsWide <= candidate.x ||
-        candidate.y + candidate.cellsHigh <= placedRect.y ||
-        placedRect.y + placedRect.cellsHigh <= candidate.y
-      );
-    });
-  };
-
-  placements.sort((left, right) => left.y - right.y || left.x - right.x);
-
-  for (let index = 0; index < placements.length; index += 1) {
-    const rect = placements[index];
-
-    while (rect.y > 0) {
-      const candidate = { ...rect, y: rect.y - 1 };
-      if (hasCollisionAt(candidate, index)) {
-        break;
-      }
-      rect.y -= 1;
-    }
-
-    while (rect.x > 0) {
-      const candidate = { ...rect, x: rect.x - 1 };
-      if (hasCollisionAt(candidate, index)) {
-        break;
-      }
-      rect.x -= 1;
-    }
-  }
-
-  const rowsUsed = Math.max(...placements.map((rect) => rect.y + rect.cellsHigh), 1);
-  const cellSize = width / columns;
-  const rowSize = cellSize * 0.74;
 
   return {
-    rects: placements.map((rect) => ({
-      item: rect.item,
-      x: rect.x * cellSize,
-      y: rect.y * rowSize,
-      width: rect.cellsWide * cellSize,
-      height: rect.cellsHigh * rowSize
+    tiles: items.map((entry, index) => ({
+      item: entry.item,
+      ...chooseSpan(entry.value, index)
     })),
-    height: rowsUsed * rowSize
+    columns,
+    rowHeight
   };
 }
 
@@ -712,7 +598,6 @@ export function ProjectMindshareBoard({
     () => createMindshareMosaic(arrangedEntries.map((entry) => ({ item: entry, value: getLayoutValue(arrangedEntries, entry) })), boardWidth),
     [arrangedEntries, boardWidth]
   );
-  const boardHeight = Math.max(layout.height, boardWidth >= 1240 ? 640 : boardWidth >= 980 ? 700 : boardWidth >= 720 ? 820 : 920);
 
   if (board.ranked.length === 0) {
     return (
@@ -777,8 +662,19 @@ export function ProjectMindshareBoard({
         {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS - 1} + others of {board.ranked.length}</span> : null}
       </div>
 
-      <div ref={boardRef} className="mindshare-board" style={{ height: `${boardHeight}px` }}>
-        {layout.rects.map(({ item: entry, x, y, width, height }) => {
+      <div
+        ref={boardRef}
+        className="mindshare-board"
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
+          gridAutoRows: `${layout.rowHeight}px`,
+          gridAutoFlow: "dense"
+        }}
+      >
+        {layout.tiles.map(({ item: entry, colSpan, rowSpan }) => {
+          const width = colSpan * (boardWidth / layout.columns);
+          const height = rowSpan * layout.rowHeight;
           const tone =
             entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
           const compact = width < 220 || height < 140;
@@ -794,10 +690,9 @@ export function ProjectMindshareBoard({
               key={entry.project.id}
               className="mindshare-tile-shell"
               style={{
-                left: `${x}px`,
-                top: `${y}px`,
-                width: `${width}px`,
-                height: `${height}px`
+                gridColumn: `span ${colSpan}`,
+                gridRow: `span ${rowSpan}`,
+                minWidth: 0
               }}
               onMouseMove={(event) => setHovered({ entry, x: event.clientX + 14, y: event.clientY + 14 })}
               onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
