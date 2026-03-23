@@ -33,6 +33,14 @@ type ProjectStats = {
   highTierWeight: number;
 };
 
+type RankedEntry = ProjectStats & {
+  share: number;
+  deltaAbsolute: number;
+  deltaRelative: number;
+  highTierShare: number;
+  isOthers?: boolean;
+};
+
 function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
 }
@@ -184,6 +192,94 @@ function getTreemapScaleClass(share: number) {
   return "mindshare-scale-small";
 }
 
+function createOthersProject(): ProjectSnapshot {
+  return {
+    id: "others",
+    projectId: -1,
+    userkey: "external:others",
+    name: "Others",
+    username: null,
+    description: null,
+    categories: [],
+    chains: [],
+    totalVotes: 0,
+    uniqueVoters: 0,
+    bullishVotes: 0,
+    bearishVotes: 0,
+    commentCount: 0,
+    aliases: []
+  };
+}
+
+function mergeTreemapEntries(entries: RankedEntry[]) {
+  if (entries.length <= 1) {
+    return entries;
+  }
+
+  const authors = new Set<string>();
+  const tierWeights: Record<TrustTier, number> = { T0: 0, T1: 0, T2: 0, T3: 0, T4: 0 };
+
+  for (const entry of entries) {
+    for (const author of entry.authors) {
+      authors.add(author);
+    }
+
+    for (const tier of Object.keys(tierWeights) as TrustTier[]) {
+      tierWeights[tier] += entry.tierWeights[tier];
+    }
+  }
+
+  const weighted = entries.reduce((sum, entry) => sum + entry.weighted, 0);
+  const previousWeighted = entries.reduce((sum, entry) => sum + entry.previousWeighted, 0);
+  const highTierWeight = entries.reduce((sum, entry) => sum + entry.highTierWeight, 0);
+  const deltaAbsolute = weighted - previousWeighted;
+  const deltaRelative = previousWeighted > 0 ? ((weighted - previousWeighted) / previousWeighted) * 100 : weighted > 0 ? 100 : 0;
+
+  return [
+    {
+      project: createOthersProject(),
+      weighted,
+      previousWeighted,
+      authors,
+      tierWeights,
+      highTierWeight,
+      share: entries.reduce((sum, entry) => sum + entry.share, 0),
+      deltaAbsolute,
+      deltaRelative,
+      highTierShare: weighted > 0 ? (highTierWeight / weighted) * 100 : 0,
+      isOthers: true
+    }
+  ];
+}
+
+function shouldMergeTile(entry: RankedEntry, rect: TreemapRect<RankedEntry>) {
+  const minSide = Math.min(rect.width, rect.height);
+  const maxSide = Math.max(rect.width, rect.height);
+  const aspectRatio = minSide > 0 ? maxSide / minSide : Number.POSITIVE_INFINITY;
+
+  return !entry.isOthers && (entry.share < 2 || minSide < 10 || aspectRatio > 6.5);
+}
+
+function buildDisplayTreemap(entries: RankedEntry[]) {
+  let working = [...entries];
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const treemap = createTreemapLayout(working.map((entry) => ({ item: entry, value: entry.share })));
+    const mergeTargets = treemap.filter((rect) => shouldMergeTile(rect.item, rect));
+
+    if (mergeTargets.length === 0) {
+      return treemap;
+    }
+
+    const mergeIds = new Set(mergeTargets.map((rect) => rect.item.project.id));
+    const keep = working.filter((entry) => !mergeIds.has(entry.project.id));
+    const merged = mergeTreemapEntries(working.filter((entry) => mergeIds.has(entry.project.id)));
+    working = [...keep, ...merged].sort((left, right) => right.share - left.share);
+  }
+
+  return createTreemapLayout(working.map((entry) => ({ item: entry, value: entry.share })));
+}
+
 export function ProjectMindshareBoard({
   projects,
   mentions
@@ -247,7 +343,7 @@ export function ProjectMindshareBoard({
     }
 
     const shareDenominator = [...statsMap.values()].reduce((sum, item) => sum + item.weighted, 0);
-    const ranked = [...statsMap.values()]
+    const ranked: RankedEntry[] = [...statsMap.values()]
       .filter((entry) => entry.weighted > 0)
       .map((entry) => {
         const share = shareDenominator > 0 ? (entry.weighted / shareDenominator) * 100 : 0;
@@ -328,7 +424,7 @@ export function ProjectMindshareBoard({
   }
 
   const tiles = board.ranked.slice(0, 20);
-  const treemap = useMemo(() => createTreemapLayout(tiles.map((entry) => ({ item: entry, value: entry.share }))), [tiles]);
+  const treemap = useMemo(() => buildDisplayTreemap(tiles), [tiles]);
 
   return (
     <div className="mindshare-stack">
