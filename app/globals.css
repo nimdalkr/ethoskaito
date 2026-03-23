@@ -758,6 +758,15 @@ code {
   background: rgba(255, 255, 255, 0.8);
 }
 
+.mindshare-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
 .mindshare-corner {
   position: absolute;
   top: 12px;

@@ -142,6 +142,11 @@ export async function getHomePageModel() {
     projectId: project.projectId,
     userkey: project.userkey,
     name: project.name,
+    logoUrl:
+      (project.raw as any)?.user?.avatarUrl ??
+      (project.raw as any)?.bannerImageUrl ??
+      project.chains?.[0]?.iconUrl ??
+      null,
     username: project.username,
     description: project.description,
     categories: Array.isArray(project.categories) ? (project.categories as any) : [],

@@ -66,6 +66,7 @@ export interface ProjectSnapshot {
   projectId: number;
   userkey: string;
   name: string;
+  logoUrl?: string | null;
   username: string | null;
   description: string | null;
   categories: Array<{ id: number; name: string; slug: string }>;

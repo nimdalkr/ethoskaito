@@ -313,6 +313,7 @@ function createOthersProject(): ProjectSnapshot {
     projectId: -1,
     userkey: "external:others",
     name: "Others",
+    logoUrl: null,
     username: null,
     description: null,
     categories: [],
@@ -696,7 +697,11 @@ export function ProjectMindshareBoard({
               <article className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}`}>
                 <div className="mindshare-meta">
                   <div className="mindshare-title-row">
-                    <div className="mindshare-dot" />
+                    {entry.project.logoUrl ? (
+                      <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
+                    ) : (
+                      <div className="mindshare-dot" />
+                    )}
                     <strong>{entry.project.name}</strong>
                   </div>
                 </div>
