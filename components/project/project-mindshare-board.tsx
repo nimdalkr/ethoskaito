@@ -60,7 +60,7 @@ const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: Trus
 
 const WINDOW_DAY_VALUES: WindowDays[] = [1, 7, 30, 90];
 const SPARKLINE_BINS = 24;
-const MAX_VISIBLE_ITEMS = 50;
+const MAX_VISIBLE_ITEMS = 20;
 
 function formatShare(value: number) {
   return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
@@ -489,6 +489,7 @@ export function ProjectMindshareBoard({
         <strong>{Math.round(board.totalWeighted)} weighted</strong>
         <span>{board.totalAuthors} active authors</span>
         <strong>{Math.round(board.highTierShare)}% high-tier</strong>
+        {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS} of {board.ranked.length}</span> : null}
       </div>
 
       <div ref={boardRef} className="mindshare-board">
