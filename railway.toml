@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.worker"
+
+[deploy]
+startCommand = "npm run collector:supervisor"
+restartPolicyType = "ALWAYS"
+restartPolicyMaxRetries = 10
