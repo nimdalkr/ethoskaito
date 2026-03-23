@@ -33,6 +33,7 @@ type RankedEntry = {
   authors: Set<string>;
   trend: number[];
   metricsByWindow: Record<WindowDays, WindowMetrics>;
+  isOthers?: boolean;
 };
 
 type TreemapRect<T> = {
@@ -302,6 +303,99 @@ function getRankTone(rank: number) {
   return "mindshare-rank-default";
 }
 
+function getRankLabel(entry: RankedEntry) {
+  return entry.isOthers ? "OT" : `#${entry.rank}`;
+}
+
+function createOthersProject(): ProjectSnapshot {
+  return {
+    id: "others",
+    projectId: -1,
+    userkey: "external:others",
+    name: "Others",
+    username: null,
+    description: null,
+    categories: [],
+    chains: [],
+    totalVotes: 0,
+    uniqueVoters: 0,
+    bullishVotes: 0,
+    bearishVotes: 0,
+    commentCount: 0,
+    aliases: []
+  };
+}
+
+function createOthersEntry(entries: RankedEntry[], rank: number): RankedEntry | null {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const authors = new Set<string>();
+  const trend = Array.from({ length: SPARKLINE_BINS }, () => 0);
+  const metricsByWindow = Object.fromEntries(
+    WINDOW_DAY_VALUES.map((days) => [
+      days,
+      {
+        currentWeight: 0,
+        previousWeight: 0,
+        share: 0,
+        deltaAbsolute: 0,
+        deltaRelative: 0
+      }
+    ])
+  ) as Record<WindowDays, WindowMetrics>;
+
+  let currentWeight = 0;
+  let mentionCount = 0;
+  let weightedHighTier = 0;
+
+  for (const entry of entries) {
+    currentWeight += entry.currentWeight;
+    mentionCount += entry.mentionCount;
+    weightedHighTier += (entry.highTierShare / 100) * entry.currentWeight;
+    entry.authors.forEach((author) => authors.add(author));
+    entry.trend.forEach((value, index) => {
+      trend[index] += value;
+    });
+
+    for (const days of WINDOW_DAY_VALUES) {
+      metricsByWindow[days].currentWeight += entry.metricsByWindow[days].currentWeight;
+      metricsByWindow[days].previousWeight += entry.metricsByWindow[days].previousWeight;
+      metricsByWindow[days].share += entry.metricsByWindow[days].share;
+    }
+  }
+
+  for (const days of WINDOW_DAY_VALUES) {
+    const metric = metricsByWindow[days];
+    metric.deltaAbsolute = metric.currentWeight - metric.previousWeight;
+    metric.deltaRelative =
+      metric.previousWeight > 0 ? ((metric.currentWeight - metric.previousWeight) / metric.previousWeight) * 100 : metric.currentWeight > 0 ? 100 : 0;
+  }
+
+  return {
+    project: createOthersProject(),
+    currentWeight,
+    mentionCount,
+    share: entries.reduce((sum, entry) => sum + entry.share, 0),
+    selectedDeltaAbsolute: entries.reduce((sum, entry) => sum + entry.selectedDeltaAbsolute, 0),
+    selectedDeltaRelative:
+      entries.reduce((sum, entry) => sum + entry.currentWeight * entry.selectedDeltaRelative, 0) / Math.max(currentWeight, 1),
+    delta24hRelative:
+      entries.reduce((sum, entry) => sum + entry.currentWeight * entry.delta24hRelative, 0) / Math.max(currentWeight, 1),
+    highTierShare: currentWeight > 0 ? (weightedHighTier / currentWeight) * 100 : 0,
+    sentiment: getSentiment(
+      entries.reduce((sum, entry) => sum + entry.currentWeight * entry.delta24hRelative, 0) / Math.max(currentWeight, 1),
+      currentWeight
+    ),
+    rank,
+    authors,
+    trend,
+    metricsByWindow,
+    isOthers: true
+  };
+}
+
 export function ProjectMindshareBoard({
   projects,
   mentions
@@ -504,7 +598,12 @@ export function ProjectMindshareBoard({
     };
   }, [mentions, projects, selectedTierFilter.tiers, selectedWindow.days]);
 
-  const visibleEntries = board.ranked.slice(0, MAX_VISIBLE_ITEMS);
+  const visibleEntries = useMemo(() => {
+    const leaders = board.ranked.slice(0, MAX_VISIBLE_ITEMS - 1);
+    const remainder = board.ranked.slice(MAX_VISIBLE_ITEMS - 1);
+    const others = createOthersEntry(remainder, MAX_VISIBLE_ITEMS);
+    return others ? [...leaders, others] : board.ranked.slice(0, MAX_VISIBLE_ITEMS);
+  }, [board.ranked]);
   const treemap = useMemo(
     () => createMindshareMosaic(visibleEntries.map((entry) => ({ item: entry, value: entry.share })), boardSize.width, boardSize.height),
     [boardSize.height, boardSize.width, visibleEntries]
@@ -570,7 +669,7 @@ export function ProjectMindshareBoard({
         <strong>{Math.round(board.totalWeighted)} weighted</strong>
         <span>{board.totalAuthors} active authors</span>
         <strong>{Math.round(board.highTierShare)}% high-tier</strong>
-        {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS} of {board.ranked.length}</span> : null}
+        {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS - 1} + others of {board.ranked.length}</span> : null}
       </div>
 
       <div ref={boardRef} className="mindshare-board">
@@ -578,7 +677,7 @@ export function ProjectMindshareBoard({
           const tone =
             entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
           const compact = width < 180 || height < 130;
-          const tiny = width < 132 || height < 102;
+          const showSparkline = !entry.isOthers && width >= 220 && height >= 150;
 
           return (
             <div
@@ -602,15 +701,15 @@ export function ProjectMindshareBoard({
                   </div>
                 </div>
                 <div className="mindshare-share">{formatShare(entry.share)}</div>
-                <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>#{entry.rank}</div>
-                {!tiny ? (
+                <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div>
+                {showSparkline ? (
                   <div className="mindshare-sparkline" aria-hidden="true">
                     <svg viewBox="0 0 100 28" preserveAspectRatio="none">
                       <path className="mindshare-sparkline-path" d={buildSparklinePath(entry.trend)} />
                     </svg>
                   </div>
                 ) : null}
-                {!compact ? <div className="mindshare-subtle">{Math.round(entry.highTierShare)}% high-tier</div> : null}
+                {!compact ? <div className="mindshare-subtle">{entry.isOthers ? "aggregated tail" : `${Math.round(entry.highTierShare)}% high-tier`}</div> : null}
               </article>
             </div>
           );
