@@ -236,6 +236,27 @@ function getAspectScore(colSpan: number, rowSpan: number, cellWidth: number, row
   return Math.abs(aspect - 1.35);
 }
 
+function applyTileExpansion(tile: MindshareGridTile<unknown>, direction: "left" | "right" | "up" | "down") {
+  if (direction === "left") {
+    tile.colStart -= 1;
+    tile.colSpan += 1;
+    return;
+  }
+
+  if (direction === "right") {
+    tile.colSpan += 1;
+    return;
+  }
+
+  if (direction === "up") {
+    tile.rowStart -= 1;
+    tile.rowSpan += 1;
+    return;
+  }
+
+  tile.rowSpan += 1;
+}
+
 function expandMindshareTiles(
   tiles: MindshareGridTile<unknown>[],
   occupancy: boolean[][],
@@ -292,21 +313,82 @@ function expandMindshareTiles(
       }
 
       clearGridCells(occupancy, tile.rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
-
-      if (selected.direction === "left") {
-        tile.colStart -= 1;
-        tile.colSpan += 1;
-      } else if (selected.direction === "right") {
-        tile.colSpan += 1;
-      } else if (selected.direction === "up") {
-        tile.rowStart -= 1;
-        tile.rowSpan += 1;
-      } else {
-        tile.rowSpan += 1;
-      }
-
+      applyTileExpansion(tile, selected.direction);
       fillGridCells(occupancy, tile.rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
       changed = true;
+    }
+  }
+}
+
+function sealSingleCellGaps(
+  tiles: MindshareGridTile<unknown>[],
+  occupancy: boolean[][],
+  columns: number,
+  maxRows: number,
+  cellWidth: number,
+  rowHeight: number
+) {
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    for (let row = 0; row < maxRows && !changed; row += 1) {
+      for (let col = 0; col < columns && !changed; col += 1) {
+        if (occupancy[row]?.[col]) {
+          continue;
+        }
+
+        const options = tiles
+          .flatMap((tile) => {
+            const candidates: Array<{ tile: MindshareGridTile<unknown>; direction: "left" | "right" | "up" | "down"; score: number }> = [];
+            const rowStart = tile.rowStart - 1;
+            const rowEnd = rowStart + tile.rowSpan - 1;
+            const colStart = tile.colStart - 1;
+            const colEnd = colStart + tile.colSpan - 1;
+
+            if (col === colEnd + 1 && row >= rowStart && row <= rowEnd && canExpandRight(tile, occupancy, columns)) {
+              candidates.push({ tile, direction: "right", score: getAspectScore(tile.colSpan + 1, tile.rowSpan, cellWidth, rowHeight) });
+            }
+
+            if (col === colStart - 1 && row >= rowStart && row <= rowEnd && canExpandLeft(tile, occupancy)) {
+              candidates.push({ tile, direction: "left", score: getAspectScore(tile.colSpan + 1, tile.rowSpan, cellWidth, rowHeight) });
+            }
+
+            if (row === rowEnd + 1 && col >= colStart && col <= colEnd && canExpandDown(tile, occupancy, maxRows)) {
+              candidates.push({ tile, direction: "down", score: getAspectScore(tile.colSpan, tile.rowSpan + 1, cellWidth, rowHeight) });
+            }
+
+            if (row === rowStart - 1 && col >= colStart && col <= colEnd && canExpandUp(tile, occupancy)) {
+              candidates.push({ tile, direction: "up", score: getAspectScore(tile.colSpan, tile.rowSpan + 1, cellWidth, rowHeight) });
+            }
+
+            return candidates;
+          })
+          .sort((left, right) => left.score - right.score);
+
+        const selected = options[0];
+        if (!selected) {
+          continue;
+        }
+
+        clearGridCells(
+          occupancy,
+          selected.tile.rowStart - 1,
+          selected.tile.colStart - 1,
+          selected.tile.colSpan,
+          selected.tile.rowSpan
+        );
+        applyTileExpansion(selected.tile, selected.direction);
+        fillGridCells(
+          occupancy,
+          selected.tile.rowStart - 1,
+          selected.tile.colStart - 1,
+          selected.tile.colSpan,
+          selected.tile.rowSpan
+        );
+        changed = true;
+      }
     }
   }
 }
@@ -370,6 +452,7 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
     width / columns,
     rowHeight
   );
+  sealSingleCellGaps(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow, width / columns, rowHeight);
 
   return {
     tiles,
