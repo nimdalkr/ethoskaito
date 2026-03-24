@@ -652,8 +652,8 @@ code {
 }
 
 .mindshare-board {
+  position: relative;
   width: 100%;
-  min-height: 760px;
   margin: 0 auto;
   padding: 2px;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -663,8 +663,15 @@ code {
   gap: 0;
 }
 
+.mindshare-board-canvas {
+  position: relative;
+  width: 100%;
+}
+
 .mindshare-tile-shell {
+  position: absolute;
   padding: 2px;
+  box-sizing: border-box;
   transition: transform 180ms ease;
 }
 
@@ -1285,10 +1292,6 @@ code {
     gap: 10px;
   }
 
-  .mindshare-board {
-    min-height: 720px;
-  }
-
   .mindshare-modal-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1343,10 +1346,6 @@ code {
   .hero-title {
     max-width: none;
     font-size: clamp(2rem, 9vw, 3rem);
-  }
-
-  .mindshare-board {
-    min-height: 760px;
   }
 
   .mindshare-modal-header,

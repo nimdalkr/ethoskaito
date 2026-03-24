@@ -44,14 +44,10 @@ type TreemapRect<T> = {
   height: number;
 };
 
-type PackedMindshareLayout<T> = {
-  tiles: Array<{
-    item: T;
-    colSpan: number;
-    rowSpan: number;
-  }>;
-  columns: number;
-  rowHeight: number;
+type MindshareTreemapLayout<T> = {
+  tiles: TreemapRect<T>[];
+  width: number;
+  height: number;
 };
 
 const WINDOW_OPTIONS: Array<{ key: MindshareWindow; label: string; days: WindowDays }> = [
@@ -182,45 +178,39 @@ function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width 
   return placed;
 }
 
-function createMindshareMosaic<T>(items: Array<{ item: T; value: number }>, width = 1000): PackedMindshareLayout<T> {
-  if (items.length === 0 || width <= 0) {
-    return { tiles: [], columns: 12, rowHeight: 72 };
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getMindshareBoardHeight(width: number) {
+  if (width <= 0) {
+    return 720;
   }
 
-  const columns = width >= 1440 ? 12 : width >= 1180 ? 10 : width >= 920 ? 8 : width >= 720 ? 6 : 4;
-  const rowHeight = Math.max(72, Math.round((width / columns) * 0.78));
+  if (width < 520) {
+    return Math.round(clamp(width * 1.3, 520, 680));
+  }
 
-  const chooseSpan = (value: number, index: number) => {
-    if (index === 0) {
-      return columns >= 10 ? { colSpan: 3, rowSpan: 4 } : { colSpan: 2, rowSpan: 4 };
-    }
+  if (width < 760) {
+    return Math.round(clamp(width * 0.98, 600, 760));
+  }
 
-    if (index === 1 || index === 2) {
-      return columns >= 10 ? { colSpan: 3, rowSpan: 3 } : { colSpan: 2, rowSpan: 3 };
-    }
+  return Math.round(clamp(width * 0.66, 720, 820));
+}
 
-    if (value >= 5) {
-      return columns >= 10 ? { colSpan: 2, rowSpan: 3 } : { colSpan: 2, rowSpan: 2 };
-    }
-
-    if (value >= 3.2) {
-      return { colSpan: 2, rowSpan: 2 };
-    }
-
-    if (value >= 2) {
-      return columns >= 8 ? { colSpan: 2, rowSpan: 2 } : { colSpan: 2, rowSpan: 2 };
-    }
-
-    return columns >= 8 ? { colSpan: 2, rowSpan: 2 } : { colSpan: 2, rowSpan: 2 };
-  };
+function createMindshareTreemap<T>(
+  items: Array<{ item: T; value: number }>,
+  width = 1000,
+  height = getMindshareBoardHeight(width)
+): MindshareTreemapLayout<T> {
+  if (items.length === 0 || width <= 0 || height <= 0) {
+    return { tiles: [], width, height };
+  }
 
   return {
-    tiles: items.map((entry, index) => ({
-      item: entry.item,
-      ...chooseSpan(entry.value, index)
-    })),
-    columns,
-    rowHeight
+    tiles: createTreemapLayout(items, width, height),
+    width,
+    height
   };
 }
 
@@ -594,9 +584,11 @@ export function ProjectMindshareBoard({
     const regular = visibleEntries.filter((entry) => !entry.isOthers);
     return [...regular.slice(0, 12), others, ...regular.slice(12)];
   }, [visibleEntries]);
+  const boardInnerWidth = Math.max(boardWidth - 4, 1);
+  const boardHeight = useMemo(() => getMindshareBoardHeight(boardInnerWidth), [boardInnerWidth]);
   const layout = useMemo(
-    () => createMindshareMosaic(arrangedEntries.map((entry) => ({ item: entry, value: getLayoutValue(arrangedEntries, entry) })), boardWidth),
-    [arrangedEntries, boardWidth]
+    () => createMindshareTreemap(arrangedEntries.map((entry) => ({ item: entry, value: getLayoutValue(arrangedEntries, entry) })), boardInnerWidth, boardHeight),
+    [arrangedEntries, boardHeight, boardInnerWidth]
   );
 
   if (board.ranked.length === 0) {
@@ -662,62 +654,40 @@ export function ProjectMindshareBoard({
         {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS - 1} + others of {board.ranked.length}</span> : null}
       </div>
 
-      <div
-        ref={boardRef}
-        className="mindshare-board"
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
-          gridAutoRows: `${layout.rowHeight}px`,
-          gridAutoFlow: "dense"
-        }}
-      >
-        {layout.tiles.map(({ item: entry, colSpan, rowSpan }) => {
-          const width = colSpan * (boardWidth / layout.columns);
-          const height = rowSpan * layout.rowHeight;
-          const tone =
-            entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
-          const compact = width < 220 || height < 140;
-          const tight = width < 180 || height < 118;
-          const micro = width < 145 || height < 92;
-          const showSparkline = !entry.isOthers && width >= 150 && height >= 92;
-          const sparklineClass = width >= 250 && height >= 165 ? "mindshare-sparkline-large" : width >= 185 && height >= 110 ? "mindshare-sparkline-medium" : "mindshare-sparkline-mini";
-          const showSubtle = !micro;
-          const showShare = true;
+      <div ref={boardRef} className="mindshare-board">
+        <div className="mindshare-board-canvas" style={{ height: `${layout.height}px` }}>
+          {layout.tiles.map(({ item: entry, x, y, width, height }) => {
+            const tone =
+              entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
+            const compact = width < 220 || height < 140;
+            const tight = width < 180 || height < 118;
+            const micro = width < 145 || height < 92;
+            const showSparkline = !entry.isOthers && width >= 150 && height >= 92;
+            const sparklineClass = width >= 250 && height >= 165 ? "mindshare-sparkline-large" : width >= 185 && height >= 110 ? "mindshare-sparkline-medium" : "mindshare-sparkline-mini";
+            const showSubtle = !micro;
+            const showShare = true;
 
-          return (
-            <div
-              key={entry.project.id}
-              className="mindshare-tile-shell"
-              style={{
-                gridColumn: `span ${colSpan}`,
-                gridRow: `span ${rowSpan}`,
-                minWidth: 0
-              }}
-              onMouseMove={(event) => setHovered({ entry, x: event.clientX + 14, y: event.clientY + 14 })}
-              onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
-              onClick={() => setSelectedEntry(entry)}
-            >
-              <article
-                className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}${
-                  tight ? " mindshare-layout-tight" : ""
-                }${micro ? " mindshare-layout-micro" : ""}`}
+            return (
+              <div
+                key={entry.project.id}
+                className="mindshare-tile-shell"
+                style={{
+                  left: `${(x / layout.width) * 100}%`,
+                  top: `${(y / layout.height) * 100}%`,
+                  width: `${(width / layout.width) * 100}%`,
+                  height: `${(height / layout.height) * 100}%`
+                }}
+                onMouseMove={(event) => setHovered({ entry, x: event.clientX + 14, y: event.clientY + 14 })}
+                onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
+                onClick={() => setSelectedEntry(entry)}
               >
-                {micro ? (
-                  <div className="mindshare-micro-row">
-                    <div className="mindshare-title-row">
-                      {entry.project.logoUrl ? (
-                        <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
-                      ) : (
-                        <div className="mindshare-dot" />
-                      )}
-                      <strong>{entry.project.name}</strong>
-                    </div>
-                    <div className="mindshare-share mindshare-share-inline">{formatShare(entry.share)}</div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mindshare-meta">
+                <article
+                  className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}${
+                    tight ? " mindshare-layout-tight" : ""
+                  }${micro ? " mindshare-layout-micro" : ""}`}
+                >
+                  {micro ? (
+                    <div className="mindshare-micro-row">
                       <div className="mindshare-title-row">
                         {entry.project.logoUrl ? (
                           <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
@@ -726,25 +696,39 @@ export function ProjectMindshareBoard({
                         )}
                         <strong>{entry.project.name}</strong>
                       </div>
+                      <div className="mindshare-share mindshare-share-inline">{formatShare(entry.share)}</div>
                     </div>
-                    {showShare ? <div className="mindshare-share">{formatShare(entry.share)}</div> : null}
-                  </>
-                )}
-                {!micro ? <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div> : null}
-                {showSparkline ? (
-                  <div className={`mindshare-sparkline ${sparklineClass}`} aria-hidden="true">
-                    <svg viewBox="0 0 100 28" preserveAspectRatio="none">
-                      <path className="mindshare-sparkline-path" d={buildSparklinePath(entry.trend)} />
-                    </svg>
-                  </div>
-                ) : null}
-                {!compact && showSubtle ? (
-                  <div className="mindshare-subtle">{entry.isOthers ? "aggregated tail" : `${Math.round(entry.highTierShare)}% high-tier`}</div>
-                ) : null}
-              </article>
-            </div>
-          );
-        })}
+                  ) : (
+                    <>
+                      <div className="mindshare-meta">
+                        <div className="mindshare-title-row">
+                          {entry.project.logoUrl ? (
+                            <img src={entry.project.logoUrl} alt="" className="mindshare-logo" loading="lazy" />
+                          ) : (
+                            <div className="mindshare-dot" />
+                          )}
+                          <strong>{entry.project.name}</strong>
+                        </div>
+                      </div>
+                      {showShare ? <div className="mindshare-share">{formatShare(entry.share)}</div> : null}
+                    </>
+                  )}
+                  {!micro ? <div className={`mindshare-corner ${getRankTone(entry.rank)}`}>{getRankLabel(entry)}</div> : null}
+                  {showSparkline ? (
+                    <div className={`mindshare-sparkline ${sparklineClass}`} aria-hidden="true">
+                      <svg viewBox="0 0 100 28" preserveAspectRatio="none">
+                        <path className="mindshare-sparkline-path" d={buildSparklinePath(entry.trend)} />
+                      </svg>
+                    </div>
+                  ) : null}
+                  {!compact && showSubtle ? (
+                    <div className="mindshare-subtle">{entry.isOthers ? "aggregated tail" : `${Math.round(entry.highTierShare)}% high-tier`}</div>
+                  ) : null}
+                </article>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {hovered ? (
