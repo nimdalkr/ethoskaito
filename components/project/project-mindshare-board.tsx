@@ -36,18 +36,20 @@ type RankedEntry = {
   isOthers?: boolean;
 };
 
-type TreemapRect<T> = {
+type MindshareGridTile<T> = {
   item: T;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  colStart: number;
+  rowStart: number;
+  colSpan: number;
+  rowSpan: number;
 };
 
-type MindshareTreemapLayout<T> = {
-  tiles: TreemapRect<T>[];
+type MindshareGridLayout<T> = {
+  tiles: MindshareGridTile<T>[];
   width: number;
-  height: number;
+  columns: number;
+  rowHeight: number;
+  rows: number;
 };
 
 const WINDOW_OPTIONS: Array<{ key: MindshareWindow; label: string; days: WindowDays }> = [
@@ -77,140 +79,147 @@ function sumValues<T>(items: Array<{ item: T; value: number }>) {
   return items.reduce((sum, item) => sum + item.value, 0);
 }
 
-function createTreemapLayout<T>(items: Array<{ item: T; value: number }>, width = 100, height = 100) {
-  const normalizedItems = items
-    .filter((item) => item.value > 0)
-    .sort((left, right) => right.value - left.value);
-
-  const total = sumValues(normalizedItems);
-  if (total <= 0 || width <= 0 || height <= 0) {
-    return [] as TreemapRect<T>[];
-  }
-
-  const worstAspectRatio = (row: Array<{ item: T; area: number }>, shortSide: number) => {
-    if (row.length === 0 || shortSide <= 0) {
-      return Number.POSITIVE_INFINITY;
-    }
-
-    const totalArea = row.reduce((sum, item) => sum + item.area, 0);
-    const maxArea = Math.max(...row.map((item) => item.area));
-    const minArea = Math.min(...row.map((item) => item.area));
-
-    return Math.max((shortSide * shortSide * maxArea) / (totalArea * totalArea), (totalArea * totalArea) / (shortSide * shortSide * minArea));
-  };
-
-  const placeRow = (
-    row: Array<{ item: T; area: number }>,
-    rect: { x: number; y: number; width: number; height: number }
-  ): { placed: TreemapRect<T>[]; remaining: { x: number; y: number; width: number; height: number } } => {
-    const totalArea = row.reduce((sum, item) => sum + item.area, 0);
-
-    if (rect.width >= rect.height) {
-      const rowHeight = totalArea / rect.width;
-      let x = rect.x;
-      const placed = row.map((entry) => {
-        const tileWidth = entry.area / rowHeight;
-        const result = { item: entry.item, x, y: rect.y, width: tileWidth, height: rowHeight };
-        x += tileWidth;
-        return result;
-      });
-
-      return {
-        placed,
-        remaining: {
-          x: rect.x,
-          y: rect.y + rowHeight,
-          width: rect.width,
-          height: rect.height - rowHeight
-        }
-      };
-    }
-
-    const rowWidth = totalArea / rect.height;
-    let y = rect.y;
-    const placed = row.map((entry) => {
-      const tileHeight = entry.area / rowWidth;
-      const result = { item: entry.item, x: rect.x, y, width: rowWidth, height: tileHeight };
-      y += tileHeight;
-      return result;
-    });
-
-    return {
-      placed,
-      remaining: {
-        x: rect.x + rowWidth,
-        y: rect.y,
-        width: rect.width - rowWidth,
-        height: rect.height
-      }
-    };
-  };
-
-  const scale = (width * height) / total;
-  const itemsWithArea = normalizedItems.map((item) => ({ item: item.item, area: item.value * scale }));
-  const placed: TreemapRect<T>[] = [];
-  let row: Array<{ item: T; area: number }> = [];
-  let remaining = { x: 0, y: 0, width, height };
-
-  while (itemsWithArea.length > 0 && remaining.width > 0 && remaining.height > 0) {
-    const candidate = itemsWithArea[0];
-    const shortSide = Math.min(remaining.width, remaining.height);
-    const nextRatio = worstAspectRatio([...row, candidate], shortSide);
-    const currentRatio = worstAspectRatio(row, shortSide);
-
-    if (row.length === 0 || nextRatio <= currentRatio) {
-      row.push(candidate);
-      itemsWithArea.shift();
-      continue;
-    }
-
-    const result = placeRow(row, remaining);
-    placed.push(...result.placed);
-    remaining = result.remaining;
-    row = [];
-  }
-
-  if (row.length > 0 && remaining.width > 0 && remaining.height > 0) {
-    const result = placeRow(row, remaining);
-    placed.push(...result.placed);
-  }
-
-  return placed;
-}
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-function getMindshareBoardHeight(width: number) {
-  if (width <= 0) {
-    return 720;
-  }
-
-  if (width < 520) {
-    return Math.round(clamp(width * 1.3, 520, 680));
-  }
-
-  if (width < 760) {
-    return Math.round(clamp(width * 0.98, 600, 760));
-  }
-
-  return Math.round(clamp(width * 0.66, 720, 820));
+function getMindshareColumns(width: number) {
+  if (width >= 1440) return 12;
+  if (width >= 1180) return 10;
+  if (width >= 920) return 8;
+  if (width >= 720) return 6;
+  return 4;
 }
 
-function createMindshareTreemap<T>(
-  items: Array<{ item: T; value: number }>,
-  width = 1000,
-  height = getMindshareBoardHeight(width)
-): MindshareTreemapLayout<T> {
-  if (items.length === 0 || width <= 0 || height <= 0) {
-    return { tiles: [], width, height };
+function getMindshareRowHeight(width: number, columns: number) {
+  return Math.max(72, Math.round((width / columns) * 0.82));
+}
+
+function getSpanCandidates(value: number, index: number, columns: number) {
+  const candidates: Array<{ colSpan: number; rowSpan: number }> = [];
+  const add = (colSpan: number, rowSpan: number) => {
+    if (colSpan > columns || colSpan <= 0 || rowSpan <= 0) {
+      return;
+    }
+
+    if (!candidates.some((candidate) => candidate.colSpan === colSpan && candidate.rowSpan === rowSpan)) {
+      candidates.push({ colSpan, rowSpan });
+    }
+  };
+
+  if (index === 0) {
+    add(columns >= 10 ? 4 : columns >= 8 ? 3 : 2, 4);
+    add(columns >= 10 ? 4 : 3, 3);
+    add(3, 3);
+  } else if (index <= 2) {
+    add(columns >= 10 ? 4 : 3, 3);
+    add(3, 3);
+    add(3, 2);
+  } else if (value >= 6) {
+    add(3, 3);
+    add(3, 2);
+    add(2, 3);
+  } else if (value >= 3.5) {
+    add(3, 2);
+    add(2, 3);
+    add(2, 2);
+  } else if (value >= 2) {
+    add(2, 2);
+    add(2, 3);
+    add(1, 2);
+  } else {
+    add(2, 2);
+    add(1, 2);
+    add(1, 1);
+  }
+
+  add(2, 2);
+  add(1, 2);
+  add(1, 1);
+  return candidates;
+}
+
+function canPlaceInGrid(occupancy: boolean[][], rowStart: number, colStart: number, colSpan: number, rowSpan: number, columns: number) {
+  if (colStart + colSpan > columns) {
+    return false;
+  }
+
+  for (let row = rowStart; row < rowStart + rowSpan; row += 1) {
+    for (let col = colStart; col < colStart + colSpan; col += 1) {
+      if (occupancy[row]?.[col]) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function fillGridCells(occupancy: boolean[][], rowStart: number, colStart: number, colSpan: number, rowSpan: number) {
+  for (let row = rowStart; row < rowStart + rowSpan; row += 1) {
+    for (let col = colStart; col < colStart + colSpan; col += 1) {
+      occupancy[row][col] = true;
+    }
+  }
+}
+
+function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width = 1000): MindshareGridLayout<T> {
+  const columns = getMindshareColumns(width);
+  const rowHeight = getMindshareRowHeight(width, columns);
+
+  if (items.length === 0 || width <= 0) {
+    return { tiles: [], width, columns, rowHeight, rows: 0 };
+  }
+
+  const occupancy: boolean[][] = [];
+  const tiles: MindshareGridTile<T>[] = [];
+  let maxRow = 0;
+
+  const ensureRows = (count: number) => {
+    while (occupancy.length < count) {
+      occupancy.push(Array.from({ length: columns }, () => false));
+    }
+  };
+
+  for (const [index, entry] of items.entries()) {
+    const candidates = getSpanCandidates(entry.value, index, columns);
+    let placed = false;
+
+    for (const candidate of candidates) {
+      for (let row = 0; row <= maxRow + 8 && !placed; row += 1) {
+        ensureRows(row + candidate.rowSpan);
+
+        for (let col = 0; col <= columns - candidate.colSpan; col += 1) {
+          if (!canPlaceInGrid(occupancy, row, col, candidate.colSpan, candidate.rowSpan, columns)) {
+            continue;
+          }
+
+          fillGridCells(occupancy, row, col, candidate.colSpan, candidate.rowSpan);
+          tiles.push({
+            item: entry.item,
+            colStart: col + 1,
+            rowStart: row + 1,
+            colSpan: candidate.colSpan,
+            rowSpan: candidate.rowSpan
+          });
+          maxRow = Math.max(maxRow, row + candidate.rowSpan);
+          placed = true;
+          break;
+        }
+      }
+
+      if (placed) {
+        break;
+      }
+    }
   }
 
   return {
-    tiles: createTreemapLayout(items, width, height),
+    tiles,
     width,
-    height
+    columns,
+    rowHeight,
+    rows: maxRow
   };
 }
 
@@ -585,10 +594,9 @@ export function ProjectMindshareBoard({
     return [...regular.slice(0, 12), others, ...regular.slice(12)];
   }, [visibleEntries]);
   const boardInnerWidth = Math.max(boardWidth - 4, 1);
-  const boardHeight = useMemo(() => getMindshareBoardHeight(boardInnerWidth), [boardInnerWidth]);
   const layout = useMemo(
-    () => createMindshareTreemap(arrangedEntries.map((entry) => ({ item: entry, value: getLayoutValue(arrangedEntries, entry) })), boardInnerWidth, boardHeight),
-    [arrangedEntries, boardHeight, boardInnerWidth]
+    () => createMindshareGrid(arrangedEntries.map((entry) => ({ item: entry, value: getLayoutValue(arrangedEntries, entry) })), boardInnerWidth),
+    [arrangedEntries, boardInnerWidth]
   );
 
   if (board.ranked.length === 0) {
@@ -655,8 +663,17 @@ export function ProjectMindshareBoard({
       </div>
 
       <div ref={boardRef} className="mindshare-board">
-        <div className="mindshare-board-canvas" style={{ height: `${layout.height}px` }}>
-          {layout.tiles.map(({ item: entry, x, y, width, height }) => {
+        <div
+          className="mindshare-board-canvas"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))`,
+            gridAutoRows: `${layout.rowHeight}px`
+          }}
+        >
+          {layout.tiles.map(({ item: entry, colStart, rowStart, colSpan, rowSpan }) => {
+            const width = colSpan * (boardInnerWidth / layout.columns);
+            const height = rowSpan * layout.rowHeight;
             const tone =
               entry.sentiment === "positive" ? "mindshare-positive" : entry.sentiment === "negative" ? "mindshare-negative" : "mindshare-neutral";
             const compact = width < 220 || height < 140;
@@ -672,10 +689,9 @@ export function ProjectMindshareBoard({
                 key={entry.project.id}
                 className="mindshare-tile-shell"
                 style={{
-                  left: `${(x / layout.width) * 100}%`,
-                  top: `${(y / layout.height) * 100}%`,
-                  width: `${(width / layout.width) * 100}%`,
-                  height: `${(height / layout.height) * 100}%`
+                  gridColumn: `${colStart} / span ${colSpan}`,
+                  gridRow: `${rowStart} / span ${rowSpan}`,
+                  minWidth: 0
                 }}
                 onMouseMove={(event) => setHovered({ entry, x: event.clientX + 14, y: event.clientY + 14 })}
                 onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
