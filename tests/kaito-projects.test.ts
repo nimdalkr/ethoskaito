@@ -22,4 +22,14 @@ describe("kaito project seed parser", () => {
     expect(entries.some((entry) => entry.name === "Polymarket")).toBe(true);
     expect(entries.some((entry) => entry.name === "Ethos Network")).toBe(true);
   });
+
+  it("adds manual seeds for active projects missing from the selected list", () => {
+    const entries = parseKaitoProjectSeed();
+    const perle = entries.find((entry) => entry.name === "Perle Labs");
+    const xoob = entries.find((entry) => entry.name === "XOOB");
+
+    expect(perle?.aliases).toContain("PerleLabs");
+    expect(perle?.aliases).toContain("PerleAI");
+    expect(xoob?.aliases).toContain("XOOBNetwork");
+  });
 });

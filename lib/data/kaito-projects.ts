@@ -7,6 +7,58 @@ const CANONICAL_NAME_OVERRIDES = new Map<string, string>([
   ["thrive protocol", "Thrive"],
   ["verse 8", "VerseEight"]
 ]);
+const EXTRA_SEED_PROJECTS = [
+  {
+    name: "3look",
+    aliases: ["3look", "3look_io", "3look.io"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "Dgrid",
+    aliases: ["dgrid", "dgrid_ai", "dgrid.ai"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "Elsa AI",
+    aliases: ["Elsa AI", "HeyElsaAI", "Elsa"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "Fluxa",
+    aliases: ["Fluxa", "FluxaPay", "fluxapay"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "ForU AI",
+    aliases: ["ForU AI", "foruai"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "idOS",
+    aliases: ["idOS", "idOS_network"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "Nasun",
+    aliases: ["Nasun", "Nasun_io"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "Perle Labs",
+    aliases: ["Perle Labs", "PerleLabs", "PerleAI", "Perle AI"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "Rayls Labs",
+    aliases: ["Rayls Labs", "RaylsLabs", "Rayls"],
+    source: KAITO_PROJECT_SOURCE
+  },
+  {
+    name: "XOOB",
+    aliases: ["XOOB", "XOOBNetwork"],
+    source: KAITO_PROJECT_SOURCE
+  }
+] satisfies KaitoSeedProject[];
 
 const KAITO_PROJECT_TEXT = `
 L0/L1
@@ -945,6 +997,10 @@ export function parseKaitoProjectSeed(text = KAITO_PROJECT_TEXT): KaitoSeedProje
         index += ticker ? 2 : 1;
       }
     }
+  }
+
+  for (const project of EXTRA_SEED_PROJECTS) {
+    upsertSeed(project.name, project.aliases);
   }
 
   return [...seeds.values()]
