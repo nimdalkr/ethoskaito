@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { isWorkerLeaseActive } from "@/lib/collector/health";
 import { DEFAULT_COLLECTOR_SHARDS, type CollectorMode } from "@/lib/collector/scheduling";
-import { isDatabaseConfigured } from "@/lib/db";
+import { isDatabaseConfigured, prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { collectTrackedTweets } from "@/lib/ingest/collect-tracked-tweets";
 
@@ -58,6 +59,23 @@ function getDefaultBatchConfig(mode: CollectorMode) {
   };
 }
 
+async function shouldSkipVercelCronRequest(isVercelCron: boolean) {
+  if (!isVercelCron || env.COLLECTOR_PRIMARY !== "worker") {
+    return false;
+  }
+
+  const lease = await prisma.workerLease.findUnique({
+    where: {
+      workerType: "collector-supervisor"
+    },
+    select: {
+      expiresAt: true
+    }
+  });
+
+  return isWorkerLeaseActive(lease);
+}
+
 export async function handleCollectorRequest(
   request: NextRequest,
   options: {
@@ -72,7 +90,7 @@ export async function handleCollectorRequest(
 
   const userAgent = request.headers.get("user-agent") ?? "";
   const isVercelCron = userAgent.includes("vercel-cron/1.0");
-  if (env.COLLECTOR_PRIMARY === "worker" && isVercelCron) {
+  if (await shouldSkipVercelCronRequest(isVercelCron)) {
     return NextResponse.json({
       skipped: true,
       reason: "collector_primary_worker"

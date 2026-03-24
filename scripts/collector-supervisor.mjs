@@ -4,10 +4,11 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+const appUrl = (process.env.APP_URL ?? "http://localhost:3000").trim();
 const secret = process.env.CRON_SECRET;
 const shardCount = Math.max(1, Number.parseInt(process.env.COLLECTOR_SHARDS ?? "40", 10) || 40);
 const mainPauseMs = Math.max(5_000, Number.parseInt(process.env.COLLECTOR_MAIN_PAUSE_MS ?? "90000", 10) || 90000);
+const idleMainPauseMs = Math.max(1_000, Number.parseInt(process.env.COLLECTOR_IDLE_SHARD_PAUSE_MS ?? "5000", 10) || 5000);
 const cyclePauseMs = Math.max(30_000, Number.parseInt(process.env.COLLECTOR_CYCLE_PAUSE_MS ?? "900000", 10) || 900000);
 const leaseSeconds = Math.max(60, Number.parseInt(process.env.COLLECTOR_LEASE_SECONDS ?? "300", 10) || 300);
 const failurePauseMs = Math.max(15_000, Number.parseInt(process.env.COLLECTOR_FAILURE_PAUSE_MS ?? "60000", 10) || 60000);
@@ -104,7 +105,7 @@ async function runMainSweep() {
       throw new Error("Collector lease was lost during main sweep");
     }
 
-    await postCollect({
+    const result = await postCollect({
       mode: "main",
       shard: String(shardId),
       shards: String(shardCount),
@@ -112,7 +113,11 @@ async function runMainSweep() {
       tweets: process.env.MAIN_COLLECTOR_TWEETS ?? "1",
       concurrency: process.env.MAIN_COLLECTOR_CONCURRENCY ?? "4"
     });
-    await sleep(mainPauseMs);
+
+    if (shardId < shardCount - 1) {
+      const pauseMs = result.selectedAccounts > 0 ? mainPauseMs : idleMainPauseMs;
+      await sleep(pauseMs);
+    }
   }
 }
 

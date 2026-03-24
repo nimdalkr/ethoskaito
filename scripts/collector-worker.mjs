@@ -1,5 +1,5 @@
 const mode = process.argv[2] ?? "main";
-const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+const appUrl = (process.env.APP_URL ?? "http://localhost:3000").trim();
 const secret = process.env.CRON_SECRET;
 const shardCount = Math.max(1, Number.parseInt(process.env.COLLECTOR_SHARDS ?? "40", 10) || 40);
 
