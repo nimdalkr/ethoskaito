@@ -1,4 +1,11 @@
 import { getTrustTierRank } from "@/lib/analytics/tier";
+import {
+  DEFAULT_RATE_LIMIT_CIRCUIT_WINDOW_MS,
+  DEFAULT_MISSING_USER_DEACTIVATION_THRESHOLD,
+  isMissingUserErrorMessage,
+  MISSING_USER_ERROR_MARKER,
+  isRateLimitCircuitOpen
+} from "@/lib/collector/health";
 import { getOfficialProjectUsernameSet } from "@/lib/collector/project-accounts";
 import { prisma } from "@/lib/db";
 import {
@@ -15,6 +22,46 @@ import { xGuestClient } from "@/lib/providers/x-guest";
 
 function isRateLimitedErrorMessage(message: string) {
   return message.includes("status 429");
+}
+
+async function deactivateStaleMissingUserAccounts() {
+  const result = await prisma.trackedAccount.updateMany({
+    where: {
+      isActive: true,
+      lastCollectorError: {
+        contains: MISSING_USER_ERROR_MARKER
+      },
+      consecutiveFailures: {
+        gte: DEFAULT_MISSING_USER_DEACTIVATION_THRESHOLD
+      }
+    },
+    data: {
+      isActive: false
+    }
+  });
+
+  return result.count;
+}
+
+async function getRateLimitCircuitState(now = new Date()) {
+  const recentRateLimitHits = await prisma.trackedAccount.count({
+    where: {
+      isActive: true,
+      lastCollectorError: {
+        contains: "429"
+      },
+      updatedAt: {
+        gte: new Date(now.getTime() - DEFAULT_RATE_LIMIT_CIRCUIT_WINDOW_MS)
+      }
+    }
+  });
+
+  return {
+    recentRateLimitHits,
+    open: isRateLimitCircuitOpen({
+      recentRateLimitHits
+    })
+  };
 }
 
 async function deactivateOfficialProjectTrackedAccounts(officialProjectUsernames: Set<string>) {
@@ -315,10 +362,13 @@ async function collectSingleAccount(input: {
       }
     });
     const consecutiveFailures = (existing?.consecutiveFailures ?? 0) + 1;
+    const shouldDeactivate =
+      isMissingUserErrorMessage(message) && consecutiveFailures >= DEFAULT_MISSING_USER_DEACTIVATION_THRESHOLD;
 
     await prisma.trackedAccount.update({
       where: { id: input.id },
       data: {
+        isActive: shouldDeactivate ? false : undefined,
         lastCollectedAt: collectedAt,
         lastSweepAt: collectedAt,
         lastDiscoveredCount: 0,
@@ -345,7 +395,8 @@ async function collectSingleAccount(input: {
       processed: 0,
       source: input.source,
       error: message,
-      rateLimited: isRateLimited
+      rateLimited: isRateLimited,
+      deactivated: shouldDeactivate
     };
   }
 }
@@ -413,12 +464,14 @@ export async function collectTrackedTweets(options: {
   schedulingBackfillLimit?: number;
 } = {}) {
   const officialProjectUsernames = await getOfficialProjectUsernameSet();
+  const deactivatedDeadAccounts = await deactivateStaleMissingUserAccounts();
   const totalTrackedAccounts = await ensureTrackedAccountsFromProjects(officialProjectUsernames);
   const mode = options.mode ?? "main";
   const accountLimit = Math.max(1, Math.min(options.accountLimit ?? 20, 2000));
   const tweetsPerAccount = Math.max(1, Math.min(options.tweetsPerAccount ?? 5, 20));
   const concurrency = Math.max(1, Math.min(options.concurrency ?? 5, 20));
   const shardCount = Math.max(1, Math.min(options.shardCount ?? DEFAULT_COLLECTOR_SHARDS, 200));
+  const circuitState = await getRateLimitCircuitState();
 
   await backfillTrackedAccountScheduling(shardCount, options.schedulingBackfillLimit ?? 1000);
 
@@ -431,6 +484,67 @@ export async function collectTrackedTweets(options: {
       selectedAccounts: 0
     }
   });
+
+  if (circuitState.open) {
+    if (typeof options.shardId === "number") {
+      await prisma.collectorShardState.upsert({
+        where: {
+          mode_shardId_shardCount: {
+            mode,
+            shardId: options.shardId,
+            shardCount
+          }
+        },
+        update: {
+          status: "skipped_rate_limited",
+          lastRunId: run.id,
+          lastStartedAt: run.startedAt,
+          lastCompletedAt: new Date(),
+          errorCount: circuitState.recentRateLimitHits
+        },
+        create: {
+          mode,
+          shardId: options.shardId,
+          shardCount,
+          status: "skipped_rate_limited",
+          lastRunId: run.id,
+          lastStartedAt: run.startedAt,
+          lastCompletedAt: new Date(),
+          errorCount: circuitState.recentRateLimitHits
+        }
+      });
+    }
+
+    await prisma.collectorRun.update({
+      where: { id: run.id },
+      data: {
+        status: "skipped_rate_limited",
+        errorCount: circuitState.recentRateLimitHits,
+        completedAt: new Date()
+      }
+    });
+
+    return {
+      runId: run.id,
+      mode,
+      shardId: options.shardId ?? null,
+      shardCount,
+      totalTrackedAccounts,
+      selectedAccounts: 0,
+      remainingUncollected: 0,
+      coveredLast24h: 0,
+      dueNow: 0,
+      discovered: 0,
+      queued: 0,
+      processed: 0,
+      errors: 0,
+      rateLimitErrors: circuitState.recentRateLimitHits,
+      stoppedDueToRateLimit: true,
+      circuitOpen: true,
+      deactivatedDeadAccounts,
+      results: []
+    };
+  }
 
   if (typeof options.shardId === "number") {
     await prisma.collectorShardState.upsert({
@@ -560,6 +674,8 @@ export async function collectTrackedTweets(options: {
     errors,
     rateLimitErrors,
     stoppedDueToRateLimit: accountExecution.stoppedDueToRateLimit,
+    circuitOpen: false,
+    deactivatedDeadAccounts,
     results: accountResults
   };
 }
