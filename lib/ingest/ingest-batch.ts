@@ -1,3 +1,4 @@
+import { getOfficialProjectUsernameSet, isOfficialProjectUsername } from "@/lib/collector/project-accounts";
 import { prisma } from "@/lib/db";
 import { matchProjectsByText } from "@/lib/analytics/project-match";
 import { getTierWeight } from "@/lib/analytics/tier";
@@ -34,6 +35,7 @@ function matchProjectsForTweet(input: {
 
 export async function ingestTweetBatch(input: IngestBatchInput) {
   const projects = await ensureAliasesLoaded();
+  const officialProjectUsernames = await getOfficialProjectUsernameSet();
   const aliasCandidates = projects.map((project: any) => ({
     projectId: project.id,
     aliases: project.aliases.map((alias: any) => alias.alias)
@@ -52,30 +54,33 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
     const rawUser = ethosUsersByUsername.get(item.xUsername.trim().toLowerCase()) ?? (await ethosClient.getUserByX(item.xUsername));
     const snapshot = buildEthosUserSnapshot(rawUser, rawUser?.level ?? undefined);
     const userRecord = await upsertEthosUser(snapshot, rawUser);
+    const isOfficialAuthor = isOfficialProjectUsername(item.xUsername, officialProjectUsernames);
 
-    await prisma.trackedAccount.upsert({
-      where: { xUsername: item.xUsername },
-      update: {
-        ethosUserkey: snapshot.userkey,
-        source: item.source,
-        priorityScore: buildTrackedAccountWriteData({
-          xUsername: item.xUsername,
+    if (!isOfficialAuthor) {
+      await prisma.trackedAccount.upsert({
+        where: { xUsername: item.xUsername },
+        update: {
           ethosUserkey: snapshot.userkey,
           source: item.source,
-          trustComposite: snapshot.trustComposite,
-          lastObservedTweetAt: normalizedTweet.createdAt
-        }).priorityScore
-      },
-      create: {
-        ...buildTrackedAccountWriteData({
-          xUsername: item.xUsername,
-          ethosUserkey: snapshot.userkey,
-          source: item.source,
-          trustComposite: snapshot.trustComposite,
-          lastObservedTweetAt: normalizedTweet.createdAt
-        })
-      }
-    });
+          priorityScore: buildTrackedAccountWriteData({
+            xUsername: item.xUsername,
+            ethosUserkey: snapshot.userkey,
+            source: item.source,
+            trustComposite: snapshot.trustComposite,
+            lastObservedTweetAt: normalizedTweet.createdAt
+          }).priorityScore
+        },
+        create: {
+          ...buildTrackedAccountWriteData({
+            xUsername: item.xUsername,
+            ethosUserkey: snapshot.userkey,
+            source: item.source,
+            trustComposite: snapshot.trustComposite,
+            lastObservedTweetAt: normalizedTweet.createdAt
+          })
+        }
+      });
+    }
 
     const tweetRecord = await prisma.tweet.upsert({
       where: { tweetId: normalizedTweet.tweetId },

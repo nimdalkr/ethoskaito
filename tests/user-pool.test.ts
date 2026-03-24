@@ -64,4 +64,22 @@ describe("user pool tracking", () => {
     expect(accounts).toHaveLength(1);
     expect(accounts[0]?.xUsername).toBe("usable");
   });
+
+  it("skips official project accounts", () => {
+    const accounts = extractTrackableAccounts(
+      [
+        makeUser({ userkey: "userkey-1", username: "monad" }),
+        makeUser({ userId: "2", userkey: "userkey-2", username: "builder_alpha" })
+      ],
+      new Set(["monad"])
+    );
+
+    expect(accounts).toEqual([
+      {
+        xUsername: "builder_alpha",
+        ethosUserkey: "userkey-2",
+        source: "ethos-profile-sync"
+      }
+    ]);
+  });
 });

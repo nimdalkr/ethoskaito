@@ -1,4 +1,5 @@
 import { getTrustTierRank } from "@/lib/analytics/tier";
+import { getOfficialProjectUsernameSet } from "@/lib/collector/project-accounts";
 import { prisma } from "@/lib/db";
 import {
   DEFAULT_COLLECTOR_SHARDS,
@@ -12,54 +13,44 @@ import { buildTrackedAccountWriteData } from "@/lib/data/users";
 import { ingestTweetBatch } from "@/lib/ingest/ingest-batch";
 import { xGuestClient } from "@/lib/providers/x-guest";
 
-function normalizeUsername(value: string) {
-  return value.trim().replace(/^@+/, "").toLowerCase();
-}
-
 function isRateLimitedErrorMessage(message: string) {
   return message.includes("status 429");
 }
 
-async function ensureTrackedAccountsFromProjects() {
-  const trackedCount = await prisma.trackedAccount.count({
-    where: {
-      isActive: true
-    }
-  });
-
-  if (trackedCount > 0) {
-    return trackedCount;
-  }
-
-  const projects = await prisma.project.findMany({
-    where: {
-      username: {
-        not: null
-      }
-    },
-    select: {
-      username: true
-    }
-  });
-
-  const usernames = [...new Set(projects.map((project) => normalizeUsername(project.username!)).filter(Boolean))];
+async function deactivateOfficialProjectTrackedAccounts(officialProjectUsernames: Set<string>) {
+  const usernames = [...officialProjectUsernames];
   if (usernames.length === 0) {
     return 0;
   }
 
-  await prisma.trackedAccount.createMany({
-    data: usernames.map((xUsername) =>
-      buildTrackedAccountWriteData({
-        xUsername,
-        source: "ethos-project-sync"
-      })
-    ),
-    skipDuplicates: true
+  const result = await prisma.trackedAccount.updateMany({
+    where: {
+      isActive: true,
+      xUsername: {
+        in: usernames
+      }
+    },
+    data: {
+      isActive: false
+    }
   });
+
+  return result.count;
+}
+
+async function ensureTrackedAccountsFromProjects(officialProjectUsernames: Set<string>) {
+  await deactivateOfficialProjectTrackedAccounts(officialProjectUsernames);
 
   return prisma.trackedAccount.count({
     where: {
-      isActive: true
+      isActive: true,
+      ...(officialProjectUsernames.size > 0
+        ? {
+            xUsername: {
+              notIn: [...officialProjectUsernames]
+            }
+          }
+        : {})
     }
   });
 }
@@ -140,12 +131,19 @@ async function getCollectionCandidates(input: {
   mode: CollectorMode;
   accountLimit: number;
   shardId?: number | null;
+  officialProjectUsernames: Set<string>;
 }) {
   const now = new Date();
   const where: any = {
     isActive: true,
     OR: [{ nextEligibleAt: null }, { nextEligibleAt: { lte: now } }]
   };
+
+  if (input.officialProjectUsernames.size > 0) {
+    where.xUsername = {
+      notIn: [...input.officialProjectUsernames]
+    };
+  }
 
   if (typeof input.shardId === "number") {
     where.assignedShardId = input.shardId;
@@ -414,7 +412,8 @@ export async function collectTrackedTweets(options: {
   shardCount?: number;
   schedulingBackfillLimit?: number;
 } = {}) {
-  const totalTrackedAccounts = await ensureTrackedAccountsFromProjects();
+  const officialProjectUsernames = await getOfficialProjectUsernameSet();
+  const totalTrackedAccounts = await ensureTrackedAccountsFromProjects(officialProjectUsernames);
   const mode = options.mode ?? "main";
   const accountLimit = Math.max(1, Math.min(options.accountLimit ?? 20, 2000));
   const tweetsPerAccount = Math.max(1, Math.min(options.tweetsPerAccount ?? 5, 20));
@@ -461,7 +460,8 @@ export async function collectTrackedTweets(options: {
   const accounts = await getCollectionCandidates({
     mode,
     accountLimit,
-    shardId: options.shardId
+    shardId: options.shardId,
+    officialProjectUsernames
   });
 
   await prisma.collectorRun.update({

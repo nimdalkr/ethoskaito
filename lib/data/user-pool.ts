@@ -1,13 +1,10 @@
 import { prisma } from "@/lib/db";
+import { getOfficialProjectUsernameSet, isOfficialProjectUsername, normalizeXUsername } from "@/lib/collector/project-accounts";
 import { buildEthosUserSnapshot, buildEthosUserWriteData, buildTrackedAccountWriteData } from "@/lib/data/users";
 import { ethosClient } from "@/lib/providers/ethos";
 import type { EthosUserSnapshot } from "@/lib/types/domain";
 
-function normalizeUsername(value: string) {
-  return value.trim().replace(/^@+/, "").toLowerCase();
-}
-
-export function extractTrackableAccounts(users: EthosUserSnapshot[]) {
+export function extractTrackableAccounts(users: EthosUserSnapshot[], officialProjectUsernames = new Set<string>()) {
   const accountMap = new Map<string, { xUsername: string; ethosUserkey: string; source: string }>();
 
   for (const user of users) {
@@ -15,8 +12,11 @@ export function extractTrackableAccounts(users: EthosUserSnapshot[]) {
       continue;
     }
 
-    const xUsername = normalizeUsername(user.username);
+    const xUsername = normalizeXUsername(user.username);
     if (!xUsername) {
+      continue;
+    }
+    if (isOfficialProjectUsername(xUsername, officialProjectUsernames)) {
       continue;
     }
 
@@ -51,6 +51,7 @@ export async function syncEthosUserPool(options: {
   let updatedUsers = 0;
   let createdTrackedAccounts = 0;
   let updatedTrackedAccounts = 0;
+  const officialProjectUsernames = await getOfficialProjectUsernameSet();
 
   while (offset < total && pages < maxPages) {
     const page = await ethosClient.getProfilesPage({
@@ -101,7 +102,7 @@ export async function syncEthosUserPool(options: {
     }
     syncedUsers += snapshots.length;
 
-    const trackedAccounts = extractTrackableAccounts(snapshots);
+    const trackedAccounts = extractTrackableAccounts(snapshots, officialProjectUsernames);
     const existingTrackedAccounts = await prisma.trackedAccount.findMany({
       where: {
         xUsername: {
