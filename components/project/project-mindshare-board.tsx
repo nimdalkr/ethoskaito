@@ -163,6 +163,154 @@ function fillGridCells(occupancy: boolean[][], rowStart: number, colStart: numbe
   }
 }
 
+function clearGridCells(occupancy: boolean[][], rowStart: number, colStart: number, colSpan: number, rowSpan: number) {
+  for (let row = rowStart; row < rowStart + rowSpan; row += 1) {
+    for (let col = colStart; col < colStart + colSpan; col += 1) {
+      occupancy[row][col] = false;
+    }
+  }
+}
+
+function canExpandRight(tile: MindshareGridTile<unknown>, occupancy: boolean[][], columns: number) {
+  const colIndex = tile.colStart - 1 + tile.colSpan;
+  if (colIndex >= columns) {
+    return false;
+  }
+
+  for (let row = tile.rowStart - 1; row < tile.rowStart - 1 + tile.rowSpan; row += 1) {
+    if (occupancy[row]?.[colIndex]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function canExpandLeft(tile: MindshareGridTile<unknown>, occupancy: boolean[][]) {
+  const colIndex = tile.colStart - 2;
+  if (colIndex < 0) {
+    return false;
+  }
+
+  for (let row = tile.rowStart - 1; row < tile.rowStart - 1 + tile.rowSpan; row += 1) {
+    if (occupancy[row]?.[colIndex]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function canExpandDown(tile: MindshareGridTile<unknown>, occupancy: boolean[][], maxRows: number) {
+  const rowIndex = tile.rowStart - 1 + tile.rowSpan;
+  if (rowIndex >= maxRows) {
+    return false;
+  }
+
+  for (let col = tile.colStart - 1; col < tile.colStart - 1 + tile.colSpan; col += 1) {
+    if (occupancy[rowIndex]?.[col]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function canExpandUp(tile: MindshareGridTile<unknown>, occupancy: boolean[][]) {
+  const rowIndex = tile.rowStart - 2;
+  if (rowIndex < 0) {
+    return false;
+  }
+
+  for (let col = tile.colStart - 1; col < tile.colStart - 1 + tile.colSpan; col += 1) {
+    if (occupancy[rowIndex]?.[col]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function getAspectScore(colSpan: number, rowSpan: number, cellWidth: number, rowHeight: number) {
+  const aspect = (colSpan * cellWidth) / Math.max(rowSpan * rowHeight, 1);
+  return Math.abs(aspect - 1.35);
+}
+
+function expandMindshareTiles(
+  tiles: MindshareGridTile<unknown>[],
+  occupancy: boolean[][],
+  columns: number,
+  maxRows: number,
+  cellWidth: number,
+  rowHeight: number
+) {
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    for (const tile of tiles) {
+      const canGrowLeft = canExpandLeft(tile, occupancy);
+      const canGrowRight = canExpandRight(tile, occupancy, columns);
+      const canGrowUp = canExpandUp(tile, occupancy);
+      const canGrowDown = canExpandDown(tile, occupancy, maxRows);
+      if (!canGrowLeft && !canGrowRight && !canGrowUp && !canGrowDown) {
+        continue;
+      }
+
+      const options = [
+        canGrowLeft
+          ? {
+              direction: "left" as const,
+              score: getAspectScore(tile.colSpan + 1, tile.rowSpan, cellWidth, rowHeight)
+            }
+          : null,
+        canGrowRight
+          ? {
+              direction: "right" as const,
+              score: getAspectScore(tile.colSpan + 1, tile.rowSpan, cellWidth, rowHeight)
+            }
+          : null,
+        canGrowUp
+          ? {
+              direction: "up" as const,
+              score: getAspectScore(tile.colSpan, tile.rowSpan + 1, cellWidth, rowHeight)
+            }
+          : null,
+        canGrowDown
+          ? {
+              direction: "down" as const,
+              score: getAspectScore(tile.colSpan, tile.rowSpan + 1, cellWidth, rowHeight)
+            }
+          : null
+      ].filter((option): option is { direction: "left" | "right" | "up" | "down"; score: number } => Boolean(option));
+
+      options.sort((left, right) => left.score - right.score);
+      const selected = options[0];
+      if (!selected) {
+        continue;
+      }
+
+      clearGridCells(occupancy, tile.rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
+
+      if (selected.direction === "left") {
+        tile.colStart -= 1;
+        tile.colSpan += 1;
+      } else if (selected.direction === "right") {
+        tile.colSpan += 1;
+      } else if (selected.direction === "up") {
+        tile.rowStart -= 1;
+        tile.rowSpan += 1;
+      } else {
+        tile.rowSpan += 1;
+      }
+
+      fillGridCells(occupancy, tile.rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
+      changed = true;
+    }
+  }
+}
+
 function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width = 1000): MindshareGridLayout<T> {
   const columns = getMindshareColumns(width);
   const rowHeight = getMindshareRowHeight(width, columns);
@@ -213,6 +361,15 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
       }
     }
   }
+
+  expandMindshareTiles(
+    tiles as MindshareGridTile<unknown>[],
+    occupancy,
+    columns,
+    maxRow,
+    width / columns,
+    rowHeight
+  );
 
   return {
     tiles,
