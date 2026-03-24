@@ -480,6 +480,219 @@ function generateLocalSizeCandidates(baseColSpan: number, baseRowSpan: number, b
   return candidates;
 }
 
+function getTileLayoutMeta(tile: MindshareGridTile<unknown>) {
+  const item = tile.item as { isOthers?: boolean; rank?: number; share?: number } | undefined;
+  return {
+    isOthers: Boolean(item?.isOthers),
+    rank: item?.rank ?? 999,
+    share: item?.share ?? 0
+  };
+}
+
+function generateRegionCandidates(
+  tile: MindshareGridTile<unknown>,
+  boxWidth: number,
+  boxHeight: number
+): Array<{ colSpan: number; rowSpan: number; score: number }> {
+  const { isOthers, rank, share } = getTileLayoutMeta(tile);
+  const baseArea = tile.colSpan * tile.rowSpan;
+  const areaSlack = isOthers ? 8 : rank >= 13 || share <= 2.6 ? 3 : 1;
+  const minAspect = isOthers ? 0.34 : rank >= 13 || share <= 2.6 ? 0.42 : 0.55;
+  const maxAspect = isOthers ? 4.4 : rank >= 13 || share <= 2.6 ? 3.4 : 2.8;
+  const candidates: Array<{ colSpan: number; rowSpan: number; score: number }> = [];
+
+  for (let colSpan = 1; colSpan <= boxWidth; colSpan += 1) {
+    for (let rowSpan = 1; rowSpan <= boxHeight; rowSpan += 1) {
+      const area = colSpan * rowSpan;
+      if (Math.abs(area - baseArea) > areaSlack) {
+        continue;
+      }
+
+      const aspect = colSpan / rowSpan;
+      if (aspect < minAspect || aspect > maxAspect) {
+        continue;
+      }
+
+      candidates.push({
+        colSpan,
+        rowSpan,
+        score:
+          Math.abs(area - baseArea) * (isOthers ? 0.55 : 1.35) +
+          Math.abs(colSpan - tile.colSpan) * 0.7 +
+          Math.abs(rowSpan - tile.rowSpan) * 0.7 +
+          (isOthers ? 0 : rank >= 13 || share <= 2.6 ? 0.25 : 0.8)
+      });
+    }
+  }
+
+  candidates.sort((left, right) => left.score - right.score);
+  return candidates;
+}
+
+function repackTailRegion(
+  tiles: MindshareGridTile<unknown>[],
+  occupancy: boolean[][],
+  columns: number,
+  maxRows: number
+) {
+  const bufferIndex = tiles.findIndex((tile) => getTileLayoutMeta(tile).isOthers);
+  if (bufferIndex < 0) {
+    return;
+  }
+
+  const bufferTile = tiles[bufferIndex];
+  const seedIndexes = tiles.flatMap((tile, index) => {
+    const meta = getTileLayoutMeta(tile);
+    if (meta.isOthers || meta.rank >= 13 || tile.rowStart >= bufferTile.rowStart) {
+      return [index];
+    }
+
+    return [];
+  });
+
+  if (seedIndexes.length < 3) {
+    return;
+  }
+
+  const seedTiles = seedIndexes.map((index) => tiles[index]);
+  const rowStart = Math.max(0, Math.min(...seedTiles.map((tile) => tile.rowStart - 1)));
+  const colStart = Math.max(0, Math.min(...seedTiles.map((tile) => tile.colStart - 1)));
+  const rowEnd = maxRows - 1;
+  const colEnd = columns - 1;
+  const selectedTileIndexes = tiles
+    .map((tile, index) => (intersectsBox(tile, rowStart, rowEnd, colStart, colEnd) ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (selectedTileIndexes.length < 3 || selectedTileIndexes.length > 8) {
+    return;
+  }
+
+  const boxWidth = colEnd - colStart + 1;
+  const boxHeight = rowEnd - rowStart + 1;
+  if (boxWidth * boxHeight > 36) {
+    return;
+  }
+
+  const localTiles = selectedTileIndexes.map((tileIndex) => ({
+    tileIndex,
+    base: tiles[tileIndex],
+    candidates: generateRegionCandidates(tiles[tileIndex], boxWidth, boxHeight)
+  }));
+
+  if (localTiles.some((tile) => tile.candidates.length === 0)) {
+    return;
+  }
+
+  const boxOccupancy = Array.from({ length: boxHeight }, () => Array.from({ length: boxWidth }, () => false));
+  const placements = new Map<number, { rowStart: number; colStart: number; colSpan: number; rowSpan: number }>();
+
+  const search = (remaining: typeof localTiles): boolean => {
+    let firstEmpty: { row: number; col: number } | null = null;
+
+    for (let row = 0; row < boxHeight && !firstEmpty; row += 1) {
+      for (let col = 0; col < boxWidth; col += 1) {
+        if (!boxOccupancy[row][col]) {
+          firstEmpty = { row, col };
+          break;
+        }
+      }
+    }
+
+    if (!firstEmpty) {
+      return remaining.length === 0;
+    }
+
+    const emptyCount = boxOccupancy.flat().filter((filled) => !filled).length;
+    const minPossible = remaining.reduce((sum, tile) => sum + Math.min(...tile.candidates.map((candidate) => candidate.colSpan * candidate.rowSpan)), 0);
+    const maxPossible = remaining.reduce((sum, tile) => sum + Math.max(...tile.candidates.map((candidate) => candidate.colSpan * candidate.rowSpan)), 0);
+    if (emptyCount < minPossible || emptyCount > maxPossible) {
+      return false;
+    }
+
+    const ordered = [...remaining].sort((left, right) => {
+      const leftMeta = getTileLayoutMeta(left.base);
+      const rightMeta = getTileLayoutMeta(right.base);
+      const leftPriority = leftMeta.isOthers ? 2 : leftMeta.rank >= 13 || leftMeta.share <= 2.6 ? 1 : 0;
+      const rightPriority = rightMeta.isOthers ? 2 : rightMeta.rank >= 13 || rightMeta.share <= 2.6 ? 1 : 0;
+
+      return (
+        leftPriority - rightPriority ||
+        right.base.colSpan * right.base.rowSpan - left.base.colSpan * left.base.rowSpan ||
+        left.candidates.length - right.candidates.length
+      );
+    });
+
+    for (const tile of ordered) {
+      for (const candidate of tile.candidates) {
+        for (let row = Math.max(0, firstEmpty.row - candidate.rowSpan + 1); row <= firstEmpty.row; row += 1) {
+          for (let col = Math.max(0, firstEmpty.col - candidate.colSpan + 1); col <= firstEmpty.col; col += 1) {
+            if (row + candidate.rowSpan > boxHeight || col + candidate.colSpan > boxWidth) {
+              continue;
+            }
+
+            let canPlace = true;
+            for (let y = row; y < row + candidate.rowSpan && canPlace; y += 1) {
+              for (let x = col; x < col + candidate.colSpan; x += 1) {
+                if (boxOccupancy[y][x]) {
+                  canPlace = false;
+                  break;
+                }
+              }
+            }
+
+            if (!canPlace) {
+              continue;
+            }
+
+            for (let y = row; y < row + candidate.rowSpan; y += 1) {
+              for (let x = col; x < col + candidate.colSpan; x += 1) {
+                boxOccupancy[y][x] = true;
+              }
+            }
+
+            placements.set(tile.tileIndex, { rowStart: row, colStart: col, colSpan: candidate.colSpan, rowSpan: candidate.rowSpan });
+
+            if (search(remaining.filter((entry) => entry.tileIndex !== tile.tileIndex))) {
+              return true;
+            }
+
+            placements.delete(tile.tileIndex);
+            for (let y = row; y < row + candidate.rowSpan; y += 1) {
+              for (let x = col; x < col + candidate.colSpan; x += 1) {
+                boxOccupancy[y][x] = false;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (!search(localTiles)) {
+    return;
+  }
+
+  for (const tileIndex of selectedTileIndexes) {
+    const tile = tiles[tileIndex];
+    clearGridCells(occupancy, tile.rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
+  }
+
+  for (const [tileIndex, placement] of placements.entries()) {
+    const tile = tiles[tileIndex];
+    tile.rowStart = rowStart + placement.rowStart + 1;
+    tile.colStart = colStart + placement.colStart + 1;
+    tile.colSpan = placement.colSpan;
+    tile.rowSpan = placement.rowSpan;
+  }
+
+  for (const tileIndex of selectedTileIndexes) {
+    const tile = tiles[tileIndex];
+    fillGridCells(occupancy, tile.rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
+  }
+}
+
 function repackGapNeighborhood(
   tiles: MindshareGridTile<unknown>[],
   occupancy: boolean[][],
@@ -731,6 +944,7 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
     width / columns,
     rowHeight
   );
+  repackTailRegion(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow);
   sealSingleCellGaps(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow, width / columns, rowHeight);
   repackGapNeighborhood(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow);
 
