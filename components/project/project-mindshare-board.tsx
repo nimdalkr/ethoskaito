@@ -92,7 +92,7 @@ function getMindshareColumns(width: number) {
 }
 
 function getMindshareRowHeight(width: number, columns: number) {
-  return Math.max(72, Math.round((width / columns) * 0.82));
+  return Math.max(56, Math.round((width / columns) * 0.68));
 }
 
 function getSpanCandidates(value: number, index: number, columns: number) {
@@ -1122,7 +1122,7 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
   let maxRow = 0;
   const heroAnchorCount = getHeroAnchorCount(columns, items.length);
   const heroAnchorSpans = getHeroAnchorSpans(columns, heroAnchorCount);
-  const heroRowSpan = columns >= 8 ? 4 : columns >= 6 ? 3 : 2;
+  const heroRowSpan = columns >= 8 ? 3 : 2;
   const heroItems = items.slice(0, heroAnchorCount);
   const remainingItems = items.slice(heroAnchorCount);
 
