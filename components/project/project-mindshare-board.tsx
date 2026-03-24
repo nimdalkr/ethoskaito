@@ -720,6 +720,39 @@ function solveTailExactRegion<T>(
   return null;
 }
 
+function getHeroAnchorCount(columns: number, itemCount: number) {
+  if (itemCount <= 0) {
+    return 0;
+  }
+
+  if (columns >= 6) {
+    return Math.min(3, itemCount);
+  }
+
+  return Math.min(2, itemCount);
+}
+
+function getHeroAnchorSpans(columns: number, anchorCount: number) {
+  if (anchorCount <= 0) {
+    return [];
+  }
+
+  if (anchorCount === 1) {
+    return [columns];
+  }
+
+  if (anchorCount === 2) {
+    const left = Math.ceil(columns / 2);
+    return [left, columns - left];
+  }
+
+  const first = Math.max(2, Math.round(columns * 0.375));
+  const remaining = columns - first;
+  const second = Math.max(2, Math.round(remaining / 2));
+  const third = Math.max(1, columns - first - second);
+  return [first, second, third];
+}
+
 function repackTailRegion(
   tiles: MindshareGridTile<unknown>[],
   occupancy: boolean[][],
@@ -1087,9 +1120,11 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
   const occupancy: boolean[][] = [];
   const tiles: MindshareGridTile<T>[] = [];
   let maxRow = 0;
-  const tailCount = getTailExactFillCount(columns, items.length);
-  const anchorItems = tailCount > 0 ? items.slice(0, items.length - tailCount) : items;
-  const tailItems = tailCount > 0 ? items.slice(items.length - tailCount) : [];
+  const heroAnchorCount = getHeroAnchorCount(columns, items.length);
+  const heroAnchorSpans = getHeroAnchorSpans(columns, heroAnchorCount);
+  const heroRowSpan = columns >= 8 ? 4 : columns >= 6 ? 3 : 2;
+  const heroItems = items.slice(0, heroAnchorCount);
+  const remainingItems = items.slice(heroAnchorCount);
 
   const ensureRows = (count: number) => {
     while (occupancy.length < count) {
@@ -1097,52 +1132,39 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
     }
   };
 
-  for (const [index, entry] of anchorItems.entries()) {
-    const candidates = getSpanCandidates(entry.value, index, columns);
-    let placed = false;
+  if (heroItems.length > 0) {
+    ensureRows(heroRowSpan);
+    let colCursor = 1;
 
-    for (const candidate of candidates) {
-      for (let row = 0; row <= maxRow + 8 && !placed; row += 1) {
-        ensureRows(row + candidate.rowSpan);
-
-        for (let col = 0; col <= columns - candidate.colSpan; col += 1) {
-          if (!canPlaceInGrid(occupancy, row, col, candidate.colSpan, candidate.rowSpan, columns)) {
-            continue;
-          }
-
-          fillGridCells(occupancy, row, col, candidate.colSpan, candidate.rowSpan);
-          tiles.push({
-            item: entry.item,
-            colStart: col + 1,
-            rowStart: row + 1,
-            colSpan: candidate.colSpan,
-            rowSpan: candidate.rowSpan
-          });
-          maxRow = Math.max(maxRow, row + candidate.rowSpan);
-          placed = true;
-          break;
-        }
-      }
-
-      if (placed) {
-        break;
-      }
+    for (const [index, entry] of heroItems.entries()) {
+      const colSpan = heroAnchorSpans[index] ?? Math.max(1, columns - colCursor + 1);
+      fillGridCells(occupancy, 0, colCursor - 1, colSpan, heroRowSpan);
+      tiles.push({
+        item: entry.item,
+        colStart: colCursor,
+        rowStart: 1,
+        colSpan,
+        rowSpan: heroRowSpan
+      });
+      colCursor += colSpan;
     }
+
+    maxRow = heroRowSpan;
   }
 
-  if (tailItems.length > 0) {
-    const solvedTail = solveTailExactRegion(
-      tailItems.map((entry, index) => ({
+  if (remainingItems.length > 0) {
+    const solvedRemaining = solveTailExactRegion(
+      remainingItems.map((entry, index) => ({
         ...entry,
-        index: anchorItems.length + index
+        index: heroAnchorCount + index
       })),
       columns
     );
 
-    if (solvedTail) {
-      ensureRows(maxRow + solvedTail.rows);
+    if (solvedRemaining) {
+      ensureRows(maxRow + solvedRemaining.rows);
 
-      for (const tile of solvedTail.tiles) {
+      for (const tile of solvedRemaining.tiles) {
         const rowStart = maxRow + tile.rowStart;
         fillGridCells(occupancy, rowStart - 1, tile.colStart - 1, tile.colSpan, tile.rowSpan);
         tiles.push({
@@ -1151,10 +1173,10 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
         });
       }
 
-      maxRow += solvedTail.rows;
+      maxRow += solvedRemaining.rows;
     } else {
-      for (const [index, entry] of tailItems.entries()) {
-        const absoluteIndex = anchorItems.length + index;
+      for (const [index, entry] of remainingItems.entries()) {
+        const absoluteIndex = heroAnchorCount + index;
         const candidates = getSpanCandidates(entry.value, absoluteIndex, columns);
         let placed = false;
 
@@ -1195,11 +1217,10 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
         width / columns,
         rowHeight
       );
-      repackTailRegion(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow);
       sealSingleCellGaps(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow, width / columns, rowHeight);
       repackGapNeighborhood(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow);
     }
-  } else {
+  } else if (heroItems.length === 0) {
     expandMindshareTiles(
       tiles as MindshareGridTile<unknown>[],
       occupancy,
@@ -1208,7 +1229,6 @@ function createMindshareGrid<T>(items: Array<{ item: T; value: number }>, width 
       width / columns,
       rowHeight
     );
-    repackTailRegion(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow);
     sealSingleCellGaps(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow, width / columns, rowHeight);
     repackGapNeighborhood(tiles as MindshareGridTile<unknown>[], occupancy, columns, maxRow);
   }
