@@ -101,6 +101,43 @@ export interface EthosActivityFeedResult {
   values: EthosActivitySummary[];
 }
 
+export interface EthosActivityActorSummary {
+  userkey: string | null;
+  profileId: number | null;
+  displayName: string | null;
+  username: string | null;
+  score: number | null;
+  level: EthosLevel | null;
+  trustComposite: number | null;
+  trustTier: TrustTier | null;
+}
+
+export interface EthosProjectActivityRecord {
+  externalActivityId: string;
+  type: string;
+  timestamp: string | null;
+  createdAt: string | null;
+  sentiment: string | null;
+  comment: string | null;
+  description: string | null;
+  upvotes: number;
+  downvotes: number;
+  replyCount: number;
+  llmQualityScore: number | null;
+  isSpam: boolean;
+  link: string | null;
+  author: EthosActivityActorSummary | null;
+  subject: EthosActivityActorSummary | null;
+  raw: JsonObject;
+}
+
+export interface EthosProjectActivityFeedResult {
+  total: number;
+  limit: number;
+  offset: number;
+  values: EthosProjectActivityRecord[];
+}
+
 export interface EthosXpMultipliers {
   scoreMultiplier: {
     value: number;

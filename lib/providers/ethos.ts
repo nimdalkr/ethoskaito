@@ -5,10 +5,13 @@ import { pickCanonicalEthosUserkey } from "@/lib/ethos/identity";
 import { clamp, normalizeToken, slugify } from "@/lib/utils";
 import { fetchJson, pickString, pickNumber, isRecord, asRecord, pickFirstRecord } from "@/lib/providers/shared";
 import type {
+  EthosActivityActorSummary,
   EthosActivityFeedResult,
   EthosActivitySummary,
   EthosCategoryRank,
   EthosCategoryRanksResult,
+  EthosProjectActivityFeedResult,
+  EthosProjectActivityRecord,
   EthosProjectCategory,
   EthosProjectChain,
   EthosProfilesPageResult,
@@ -535,6 +538,48 @@ function startCase(input: string) {
     .join(" ");
 }
 
+function pickStringArray(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (!Array.isArray(value)) {
+      continue;
+    }
+    const items = value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0);
+    if (items.length > 0) {
+      return items;
+    }
+  }
+  return [];
+}
+
+function parseJsonRecord(value: unknown) {
+  if (isRecord(value)) {
+    return value;
+  }
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return isRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function pickScalarString(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+  return "";
+}
+
 function normalizeActivitySummary(raw: unknown): EthosActivitySummary | null {
   if (!isRecord(raw)) {
     return null;
@@ -561,12 +606,141 @@ function normalizeActivitySummary(raw: unknown): EthosActivitySummary | null {
   };
 }
 
+function normalizeActivityActor(rawActor: unknown, rawUser: unknown): EthosActivityActorSummary | null {
+  const parsedUser = vouchUserSchema.safeParse(rawUser);
+  if (parsedUser.success) {
+    const user = normalizeVouchUser(parsedUser.data);
+    if (user) {
+      return {
+        userkey: user.userkey,
+        profileId: user.profileId,
+        displayName: user.displayName,
+        username: user.username,
+        score: user.score,
+        level: user.level,
+        trustComposite: user.trustComposite,
+        trustTier: user.trustTier
+      };
+    }
+  }
+
+  const parsedActor = userSchema.safeParse(rawActor);
+  if (parsedActor.success) {
+    const user = normalizeUser(parsedActor.data);
+    return {
+      userkey: user.userkey,
+      profileId: user.profileId,
+      displayName: user.displayName,
+      username: user.username,
+      score: user.score,
+      level: user.level,
+      trustComposite: user.trustComposite,
+      trustTier: user.trustTier
+    };
+  }
+
+  const actor = asRecord(rawActor);
+  const actorUser = asRecord(rawUser);
+  const username = pickString(actorUser, ["username"], "") || pickString(actor, ["username"], "");
+  const userkeys = pickStringArray(actorUser, ["userkeys"]).concat(pickStringArray(actor, ["userkeys"]));
+  const id = pickScalarString(actorUser, ["id"]) || pickScalarString(actor, ["id"]);
+  const actorUserScore = pickNumber(actorUser, ["score"], Number.NaN);
+  const actorScore = pickNumber(actor, ["score"], Number.NaN);
+  const score = Number.isFinite(actorUserScore) ? actorUserScore : actorScore;
+  const trustComposite = Number.isFinite(score) ? clamp((score / 2800) * 100, 0, 100) : Number.NaN;
+  const displayName = pickString(actorUser, ["displayName", "name"], "") || pickString(actor, ["displayName", "name"], "");
+  const actorUserProfileId = pickNumber(actorUser, ["profileId"], Number.NaN);
+  const actorProfileId = pickNumber(actor, ["profileId"], Number.NaN);
+  const profileId = Number.isFinite(actorUserProfileId) ? actorUserProfileId : actorProfileId;
+
+  if (!displayName && !username && userkeys.length === 0 && !id) {
+    return null;
+  }
+
+  return {
+    userkey: pickCanonicalEthosUserkey({
+      userkeys,
+      username: username || null,
+      id: id || null
+    }),
+    profileId: Number.isFinite(profileId) ? profileId : null,
+    displayName: displayName || null,
+    username: username || null,
+    score: Number.isFinite(score) ? score : null,
+    level: Number.isFinite(score) ? (deriveEthosLevel(score) as EthosScoreLevelResult["level"]) : null,
+    trustComposite: Number.isFinite(trustComposite) ? trustComposite : null,
+    trustTier: Number.isFinite(trustComposite) ? deriveTrustTier(trustComposite) : null
+  };
+}
+
+export function normalizeProjectActivityRecord(raw: unknown): EthosProjectActivityRecord | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+
+  const record = pickFirstRecord(raw, ["activity", "item"]);
+  const data = asRecord(record.data);
+  const translation = asRecord(record.translation);
+  const metadata = parseJsonRecord(data.metadata);
+  const author = normalizeActivityActor(record.author, record.authorUser);
+  const subject = normalizeActivityActor(record.subject, record.subjectUser);
+  const type = pickString(record, ["type", "activityType"], "activity");
+  const timestamp = pickString(record, ["timestamp"], "");
+  const createdAt = pickString(data, ["createdAt"], "") || pickString(record, ["createdAt"], "");
+  const comment =
+    pickString(translation, ["translatedContent"], "") ||
+    pickString(data, ["comment"], "") ||
+    pickString(record, ["comment", "content"], "") ||
+    null;
+  const description =
+    pickString(translation, ["translatedDescription"], "") ||
+    pickString(metadata ?? {}, ["description"], "") ||
+    pickString(record, ["description"], "") ||
+    null;
+  const externalActivityId =
+    pickScalarString(data, ["id"]) ||
+    pickScalarString(record, ["id"]) ||
+    pickString(record, ["link"], "") ||
+    [type, timestamp || createdAt, author?.userkey ?? author?.username ?? "unknown", subject?.userkey ?? subject?.username ?? "unknown"].join(":");
+
+  return {
+    externalActivityId,
+    type,
+    timestamp: timestamp || createdAt || null,
+    createdAt: createdAt || timestamp || null,
+    sentiment: pickString(data, ["score"], "") || null,
+    comment,
+    description,
+    upvotes: pickNumber(asRecord(record.votes), ["upvotes"], 0),
+    downvotes: pickNumber(asRecord(record.votes), ["downvotes"], 0),
+    replyCount: pickNumber(asRecord(record.replySummary), ["count", "replyCount", "total"], 0),
+    llmQualityScore: (() => {
+      const value = pickNumber(record, ["llmQualityScore"], Number.NaN);
+      return Number.isFinite(value) ? value : null;
+    })(),
+    isSpam: Boolean(record.isSpam ?? false),
+    link: pickString(record, ["link"], "") || null,
+    author,
+    subject,
+    raw: record,
+  };
+}
+
 function normalizeActivityFeed(value: z.infer<typeof activityFeedSchema>): EthosActivityFeedResult {
   return {
     total: value.total,
     limit: value.limit,
     offset: value.offset,
     values: value.values.map(normalizeActivitySummary).filter((item): item is EthosActivitySummary => Boolean(item))
+  };
+}
+
+function normalizeProjectActivityFeed(value: z.infer<typeof activityFeedSchema>): EthosProjectActivityFeedResult {
+  return {
+    total: value.total,
+    limit: value.limit,
+    offset: value.offset,
+    values: value.values.map(normalizeProjectActivityRecord).filter((item): item is EthosProjectActivityRecord => Boolean(item))
   };
 }
 
@@ -781,13 +955,15 @@ export class EthosClient {
 
   async getProfileActivities(
     userkey: string,
-    options: ProviderRequestOptions & { limit?: number; excludeSpam?: boolean; excludeHistorical?: boolean } = {}
+    options: ProviderRequestOptions & { limit?: number; offset?: number; excludeSpam?: boolean; excludeHistorical?: boolean } = {}
   ): Promise<EthosActivityFeedResult> {
     const limit = Math.max(1, Math.min(options.limit ?? 6, 25));
+    const offset = Math.max(0, options.offset ?? 0);
     const excludeSpam = options.excludeSpam ?? true;
     const excludeHistorical = options.excludeHistorical ?? true;
     const requestOptions = this.withHeaders({ ...options });
     delete (requestOptions as { limit?: number }).limit;
+    delete (requestOptions as { offset?: number }).offset;
     delete (requestOptions as { excludeSpam?: boolean }).excludeSpam;
     delete (requestOptions as { excludeHistorical?: boolean }).excludeHistorical;
 
@@ -804,6 +980,7 @@ export class EthosClient {
         body: JSON.stringify({
           userkey,
           limit,
+          offset,
           excludeSpam,
           excludeHistorical,
           orderBy: {
@@ -816,6 +993,48 @@ export class EthosClient {
     );
 
     return normalizeActivityFeed(data);
+  }
+
+  async getProjectActivities(
+    userkey: string,
+    options: ProviderRequestOptions & { limit?: number; offset?: number; excludeSpam?: boolean; excludeHistorical?: boolean } = {}
+  ): Promise<EthosProjectActivityFeedResult> {
+    const limit = Math.max(1, Math.min(options.limit ?? 10, 25));
+    const offset = Math.max(0, options.offset ?? 0);
+    const excludeSpam = options.excludeSpam ?? true;
+    const excludeHistorical = options.excludeHistorical ?? true;
+    const requestOptions = this.withHeaders({ ...options });
+    delete (requestOptions as { limit?: number }).limit;
+    delete (requestOptions as { offset?: number }).offset;
+    delete (requestOptions as { excludeSpam?: boolean }).excludeSpam;
+    delete (requestOptions as { excludeHistorical?: boolean }).excludeHistorical;
+
+    const { data } = await fetchJson(
+      "ethos",
+      `${this.baseUrl}/activities/project`,
+      {
+        ...requestOptions,
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(requestOptions.headers ?? {})
+        },
+        body: JSON.stringify({
+          userkey,
+          limit,
+          offset,
+          excludeSpam,
+          excludeHistorical,
+          orderBy: {
+            field: "timestamp",
+            direction: "desc"
+          }
+        })
+      },
+      (value) => activityFeedSchema.parse(value)
+    );
+
+    return normalizeProjectActivityFeed(data);
   }
 
   async getXpMultipliers(profileId: number, options: ProviderRequestOptions = {}): Promise<EthosXpMultipliers> {

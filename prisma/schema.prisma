@@ -156,6 +156,7 @@ model Project {
   categories    Json
   chains        Json
   raw           Json
+  activities    ProjectActivity[]
   aliases       ProjectAlias[]
   mentions      ProjectMention[]
   marketMappings ProjectMarketMapping[]
@@ -192,6 +193,40 @@ model ProjectMention {
 
   @@unique([tweetId, projectId])
   @@index([projectId, mentionedAt])
+}
+
+model ProjectActivity {
+  id                 String   @id @default(cuid())
+  projectId          String
+  externalActivityId String
+  type               String
+  timestamp          DateTime
+  sourceCreatedAt    DateTime?
+  sentiment          String?
+  comment            String?
+  description        String?
+  authorUserkey      String?
+  authorProfileId    Int?
+  authorUsername     String?
+  authorDisplayName  String?
+  subjectUserkey     String?
+  subjectProfileId   Int?
+  subjectUsername    String?
+  subjectDisplayName String?
+  upvotes            Int      @default(0)
+  downvotes          Int      @default(0)
+  replyCount         Int      @default(0)
+  llmQualityScore    Float?
+  isSpam             Boolean  @default(false)
+  link               String?
+  raw                Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, externalActivityId, type])
+  @@index([projectId, timestamp])
+  @@index([timestamp])
 }
 
 model ProjectOutcome {
