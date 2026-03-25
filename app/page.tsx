@@ -4,12 +4,49 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { ProjectHeatmap } from "@/components/project/project-heatmap";
 import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
 import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { getHomePageModel } from "@/lib/data/home";
 
 export const dynamic = "force-dynamic";
+
+const tierGuide = [
+  {
+    tier: "T4",
+    label: "Challenger",
+    range: "80-100",
+    weight: "10x",
+    description: "Highest-conviction cohort with the strongest Ethos composite reputation."
+  },
+  {
+    tier: "T3",
+    label: "Diamond",
+    range: "60-79.9",
+    weight: "7x",
+    description: "Strong reputation layer that still moves mindshare meaningfully."
+  },
+  {
+    tier: "T2",
+    label: "Platinum",
+    range: "40-59.9",
+    weight: "4x",
+    description: "Solid signal tier used as the broad middle of the cohort."
+  },
+  {
+    tier: "T1",
+    label: "Gold",
+    range: "20-39.9",
+    weight: "2x",
+    description: "Lower-confidence signal that still counts, but with lighter weight."
+  },
+  {
+    tier: "T0",
+    label: "Bronze",
+    range: "0-19.9",
+    weight: "1x",
+    description: "Base cohort. Included for breadth, but contributes the least weight."
+  }
+] as const;
 
 export default async function Page() {
   const model = await getHomePageModel();
@@ -48,7 +85,7 @@ export default async function Page() {
                 <div className="hero-brand">ETHOSALPHA</div>
                 <nav className="hero-nav-links" aria-label="Primary">
                   <a href="#mindshare-board">Mindshare</a>
-                  <a href="#signal-grid">Signal Grid</a>
+                  <a href="#tier-system">Tier System</a>
                   <a href="#coverage-panel">Coverage</a>
                 </nav>
               </div>
@@ -134,19 +171,39 @@ export default async function Page() {
         </Card>
       </section>
 
-      <section id="signal-grid" className="stack-4">
+      <section id="tier-system" className="stack-4">
         <Card variant="surface">
           <CardHeader className="card-header-split">
             <div className="stack-3">
-              <CardTitle>Tier x project heatmap</CardTitle>
+              <CardTitle>How The Tier System Works</CardTitle>
               <p className="muted-copy compact-copy">
-                Full-width tier distribution across the live project set. Read across for project spread and down each column for trust-layer concentration.
+                Mindshare is not raw mention count. Each author is placed into an Ethos trust tier from a composite score built from Ethos score,
+                influence percentile, human verification, review health, and vouch health. Higher tiers carry more weight in the board.
               </p>
             </div>
-            <Badge tone="neutral">Trust-weighted grid</Badge>
+            <Badge tone="neutral">Trust-weighted methodology</Badge>
           </CardHeader>
-          <CardContent>
-            <ProjectHeatmap projects={model.projects} tierRollups={model.tierRollups} />
+          <CardContent className="stack-4">
+            <div className="metric-grid">
+              {tierGuide.map((entry) => (
+                <Card key={entry.tier} variant="default">
+                  <CardContent className="stack-3">
+                    <div className="stack-2">
+                      <Badge tone="accent">
+                        {entry.tier} · {entry.label}
+                      </Badge>
+                      <strong>Composite {entry.range}</strong>
+                    </div>
+                    <p className="muted-copy compact-copy">{entry.description}</p>
+                    <div className="muted-copy compact-copy">Mindshare weight: {entry.weight}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <p className="muted-copy compact-copy">
+              Composite score formula: Ethos score contributes up to 60 points, influence percentile up to 20, human verification up to 10,
+              and review plus vouch health up to 10. Tiers are then bucketed into T0-T4 bands.
+            </p>
           </CardContent>
         </Card>
       </section>
