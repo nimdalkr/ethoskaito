@@ -4,6 +4,7 @@ import { isWorkerLeaseActive } from "@/lib/collector/health";
 import { DEFAULT_COLLECTOR_SHARDS, type CollectorMode } from "@/lib/collector/scheduling";
 import { isDatabaseConfigured, prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { collectProjectActivities } from "@/lib/ingest/project-activities";
 import { collectTrackedTweets } from "@/lib/ingest/collect-tracked-tweets";
 
 function parsePositiveInt(value: string | null, fallback: number) {
@@ -59,6 +60,21 @@ function getDefaultBatchConfig(mode: CollectorMode) {
   };
 }
 
+function getProjectActivityBucket(mode: CollectorMode, shardId: number | null) {
+  if (mode !== "hot" || typeof shardId !== "number") {
+    return null;
+  }
+
+  if (shardId < 0 || shardId > 5) {
+    return null;
+  }
+
+  return {
+    bucketIndex: shardId,
+    bucketCount: 6
+  };
+}
+
 async function shouldSkipVercelCronRequest(isVercelCron: boolean) {
   if (!isVercelCron || env.COLLECTOR_PRIMARY !== "worker") {
     return false;
@@ -76,6 +92,28 @@ async function shouldSkipVercelCronRequest(isVercelCron: boolean) {
   return isWorkerLeaseActive(lease);
 }
 
+async function maybeCollectProjectActivities(input: {
+  isVercelCron: boolean;
+  mode: CollectorMode;
+  shardId: number | null;
+}) {
+  if (!input.isVercelCron) {
+    return null;
+  }
+
+  const bucket = getProjectActivityBucket(input.mode, input.shardId);
+  if (!bucket) {
+    return null;
+  }
+
+  return collectProjectActivities({
+    bucketIndex: bucket.bucketIndex,
+    bucketCount: bucket.bucketCount,
+    activityLimit: 10,
+    sinceHours: 168
+  });
+}
+
 export async function handleCollectorRequest(
   request: NextRequest,
   options: {
@@ -86,15 +124,6 @@ export async function handleCollectorRequest(
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userAgent = request.headers.get("user-agent") ?? "";
-  const isVercelCron = userAgent.includes("vercel-cron/1.0");
-  if (await shouldSkipVercelCronRequest(isVercelCron)) {
-    return NextResponse.json({
-      skipped: true,
-      reason: "collector_primary_worker"
-    });
   }
 
   if (!isDatabaseConfigured()) {
@@ -109,6 +138,21 @@ export async function handleCollectorRequest(
   const accountLimit = parsePositiveInt(url.searchParams.get("accounts"), defaults.accountLimit);
   const tweetsPerAccount = parsePositiveInt(url.searchParams.get("tweets"), defaults.tweetsPerAccount);
   const concurrency = parsePositiveInt(url.searchParams.get("concurrency"), defaults.concurrency);
+  const userAgent = request.headers.get("user-agent") ?? "";
+  const isVercelCron = userAgent.includes("vercel-cron/1.0");
+  if (await shouldSkipVercelCronRequest(isVercelCron)) {
+    const projectActivities = await maybeCollectProjectActivities({
+      isVercelCron,
+      mode,
+      shardId
+    });
+
+    return NextResponse.json({
+      skipped: true,
+      reason: "collector_primary_worker",
+      ...(projectActivities ? { projectActivities } : {})
+    });
+  }
 
   const result = await collectTrackedTweets({
     accountLimit,
@@ -119,5 +163,14 @@ export async function handleCollectorRequest(
     shardCount
   });
 
-  return NextResponse.json(result);
+  const projectActivities = await maybeCollectProjectActivities({
+    isVercelCron,
+    mode,
+    shardId
+  });
+
+  return NextResponse.json({
+    ...result,
+    ...(projectActivities ? { projectActivities } : {})
+  });
 }

@@ -100,12 +100,6 @@
     { "path": "/api/cron/collect/hot/all-6", "schedule": "45 15 * * *" },
     { "path": "/api/cron/collect/hot/all-7", "schedule": "9 18 * * *" },
     { "path": "/api/cron/collect/hot/all-8", "schedule": "33 20 * * *" },
-    { "path": "/api/cron/collect/hot/all-9", "schedule": "57 22 * * *" },
-    { "path": "/api/cron/project-activities/0/6", "schedule": "5 */4 * * *" },
-    { "path": "/api/cron/project-activities/1/6", "schedule": "15 */4 * * *" },
-    { "path": "/api/cron/project-activities/2/6", "schedule": "25 */4 * * *" },
-    { "path": "/api/cron/project-activities/3/6", "schedule": "35 */4 * * *" },
-    { "path": "/api/cron/project-activities/4/6", "schedule": "45 */4 * * *" },
-    { "path": "/api/cron/project-activities/5/6", "schedule": "55 */4 * * *" }
+    { "path": "/api/cron/collect/hot/all-9", "schedule": "57 22 * * *" }
   ]
 }
