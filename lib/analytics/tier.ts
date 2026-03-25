@@ -12,11 +12,11 @@ const TRUST_TIER_LABELS: Record<TrustTier, string> = {
   T4: "Challenger"
 };
 
-export function getTrustTier(trustComposite: number): TrustTier {
-  if (trustComposite >= 80) return "T4";
-  if (trustComposite >= 60) return "T3";
-  if (trustComposite >= 40) return "T2";
-  if (trustComposite >= 20) return "T1";
+export function getTrustTier(score: number): TrustTier {
+  if (score >= SCORE_MAX * 0.8) return "T4";
+  if (score >= SCORE_MAX * 0.6) return "T3";
+  if (score >= SCORE_MAX * 0.4) return "T2";
+  if (score >= SCORE_MAX * 0.2) return "T1";
   return "T0";
 }
 
@@ -33,19 +33,7 @@ export function getTrustTierRank(tier: TrustTier | null | undefined) {
 }
 
 export function getTierWeight(tier: TrustTier) {
-  switch (tier) {
-    case "T4":
-      return 10;
-    case "T3":
-      return 7;
-    case "T2":
-      return 4;
-    case "T1":
-      return 2;
-    case "T0":
-    default:
-      return 1;
-  }
+  return 1;
 }
 
 function computeReviewHealth(stats: EthosStats) {

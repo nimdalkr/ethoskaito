@@ -268,10 +268,10 @@ function deriveEthosLevel(score: number) {
 }
 
 function deriveTrustTier(score: number): "T0" | "T1" | "T2" | "T3" | "T4" {
-  if (score >= 80) return "T4";
-  if (score >= 60) return "T3";
-  if (score >= 40) return "T2";
-  if (score >= 20) return "T1";
+  if (score >= 2240) return "T4";
+  if (score >= 1680) return "T3";
+  if (score >= 1120) return "T2";
+  if (score >= 560) return "T1";
   return "T0";
 }
 
@@ -348,7 +348,7 @@ function normalizeUser(user: z.infer<typeof userSchema>): EthosUserByXResult {
     xpStreakDays: user.xpStreakDays,
     stats,
     trustComposite,
-    trustTier: deriveTrustTier(trustComposite)
+    trustTier: deriveTrustTier(user.score)
   };
 }
 
@@ -474,7 +474,7 @@ function normalizeVouchUser(raw: unknown) {
     xpStreakDays: user.xpStreakDays,
     stats,
     trustComposite,
-    trustTier: deriveTrustTier(trustComposite)
+    trustTier: deriveTrustTier(user.score)
   };
 }
 
@@ -682,7 +682,7 @@ function normalizeActivityActor(rawActor: unknown, rawUser: unknown): EthosActiv
     score: Number.isFinite(score) ? score : null,
     level: Number.isFinite(score) ? (deriveEthosLevel(score) as EthosScoreLevelResult["level"]) : null,
     trustComposite: Number.isFinite(trustComposite) ? trustComposite : null,
-    trustTier: Number.isFinite(trustComposite) ? deriveTrustTier(trustComposite) : null
+    trustTier: Number.isFinite(score) ? deriveTrustTier(score) : null
   };
 }
 
@@ -834,7 +834,7 @@ export class EthosClient {
       userkey,
       score: data.score,
       level: data.level,
-      trustTier: deriveTrustTier(clamp((data.score / 2800) * 100, 0, 100))
+      trustTier: deriveTrustTier(data.score)
     };
   }
 

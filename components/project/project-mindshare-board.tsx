@@ -1675,7 +1675,7 @@ export function ProjectMindshareBoard({
 
       <div className="mindshare-context-row">
         <span>{selectedWindow.label} cohort window</span>
-        <strong>{Math.round(board.totalWeighted)} weighted</strong>
+        <strong>{Math.round(board.totalWeighted)} mentions</strong>
         <span>{board.totalAuthors} active authors</span>
         <strong>{Math.round(board.highTierShare)}% high-tier</strong>
         {board.ranked.length > MAX_VISIBLE_ITEMS ? <span>showing top {MAX_VISIBLE_ITEMS - 1} + others of {board.ranked.length}</span> : null}

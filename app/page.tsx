@@ -14,53 +14,48 @@ const tierGuide = [
   {
     tier: "T4",
     label: "Challenger",
-    range: "80-100",
-    weight: "10x",
-    description: "Highest-conviction cohort with the strongest Ethos composite reputation."
+    range: "2240-2800",
+    description: "Top Ethos score band. Use this filter when you want the highest-score cohort only."
   },
   {
     tier: "T3",
     label: "Diamond",
-    range: "60-79.9",
-    weight: "7x",
-    description: "Strong reputation layer that still moves mindshare meaningfully."
+    range: "1680-2239",
+    description: "Upper-middle Ethos score band with strong signal density."
   },
   {
     tier: "T2",
     label: "Platinum",
-    range: "40-59.9",
-    weight: "4x",
-    description: "Solid signal tier used as the broad middle of the cohort."
+    range: "1120-1679",
+    description: "Middle cohort. Useful when comparing broad adoption versus early high-score attention."
   },
   {
     tier: "T1",
     label: "Gold",
-    range: "20-39.9",
-    weight: "2x",
-    description: "Lower-confidence signal that still counts, but with lighter weight."
+    range: "560-1119",
+    description: "Lower Ethos score band that helps reveal wider spread once a project starts diffusing."
   },
   {
     tier: "T0",
     label: "Bronze",
-    range: "0-19.9",
-    weight: "1x",
-    description: "Base cohort. Included for breadth, but contributes the least weight."
+    range: "0-559",
+    description: "Base cohort. Useful for seeing whether mindshare has reached the widest layer."
   }
 ] as const;
 
 export default async function Page() {
   const model = await getHomePageModel();
-  const totalWeightedMentions = model.tierRollups.reduce((sum, row) => sum + row.weightedMentions, 0);
+  const totalMentions = model.mentions.length;
   const validatedProjects = model.outcomes.filter((outcome) => (outcome.return7d ?? 0) > 0).length;
   const firstMentions = model.mentions.filter((mention) => mention.isFirstTrackedMention);
   const topProject = [...model.projects]
     .map((project) => ({
       project,
-      weightedMentions: model.tierRollups
+      mentionCount: model.tierRollups
         .filter((row) => row.projectId === project.id)
-        .reduce((sum, row) => sum + row.weightedMentions, 0)
+        .reduce((sum, row) => sum + row.mentionCount, 0)
     }))
-    .sort((left, right) => right.weightedMentions - left.weightedMentions)[0];
+    .sort((left, right) => right.mentionCount - left.mentionCount)[0];
   const collector = model.collectorSummary;
 
   return (
@@ -118,8 +113,8 @@ export default async function Page() {
                 <strong>{topProject?.project.name ?? "No project yet"}</strong>
               </div>
               <div className="hero-strip-card">
-                <span>Weighted mentions</span>
-                <strong>{totalWeightedMentions}</strong>
+                <span>Mentions tracked</span>
+                <strong>{totalMentions}</strong>
               </div>
               <div className="hero-strip-card">
                 <span>First mention captures</span>
@@ -160,7 +155,7 @@ export default async function Page() {
             <div className="stack-3">
               <CardTitle>Mindshare arena</CardTitle>
               <p className="muted-copy compact-copy">
-                Weighted project attention from the Ethos cohort, allocated proportionally across the top twenty projects for each time window and trust cohort.
+                Project attention from the Ethos cohort, split by time window and tier filter so you can compare where conviction starts and where it spreads.
               </p>
             </div>
             <Badge tone="accent">Live cohort mindshare</Badge>
@@ -177,11 +172,11 @@ export default async function Page() {
             <div className="stack-3">
               <CardTitle>How The Tier System Works</CardTitle>
               <p className="muted-copy compact-copy">
-                Mindshare is not raw mention count. Each author is placed into an Ethos trust tier from a composite score built from Ethos score,
-                influence percentile, human verification, review health, and vouch health. Higher tiers carry more weight in the board.
+                Tiers now come directly from raw Ethos score only. Mindshare itself counts every mention equally, and tier filters let you inspect how that
+                same mention flow looks across higher-score and lower-score cohorts.
               </p>
             </div>
-            <Badge tone="neutral">Trust-weighted methodology</Badge>
+            <Badge tone="neutral">Score-based tiering</Badge>
           </CardHeader>
           <CardContent className="stack-4">
             <div className="metric-grid">
@@ -192,17 +187,16 @@ export default async function Page() {
                       <Badge tone="accent">
                         {entry.tier} · {entry.label}
                       </Badge>
-                      <strong>Composite {entry.range}</strong>
+                      <strong>Ethos score {entry.range}</strong>
                     </div>
                     <p className="muted-copy compact-copy">{entry.description}</p>
-                    <div className="muted-copy compact-copy">Mindshare weight: {entry.weight}</div>
                   </CardContent>
                 </Card>
               ))}
             </div>
             <p className="muted-copy compact-copy">
-              Composite score formula: Ethos score contributes up to 60 points, influence percentile up to 20, human verification up to 10,
-              and review plus vouch health up to 10. Tiers are then bucketed into T0-T4 bands.
+              Tier cutoffs use the Ethos score scale directly: T0 under 560, T1 from 560, T2 from 1120, T3 from 1680, and T4 from 2240 upward. To compare
+              cohorts, switch the tier filter in the mindshare board instead of adding extra weight to top tiers.
             </p>
           </CardContent>
         </Card>

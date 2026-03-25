@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { computeTrustComposite, getTierWeight, getTrustTier, getTrustTierLabel } from "@/lib/analytics/tier";
 
 describe("tier analytics", () => {
-  it("assigns the correct tier bucket", () => {
-    expect(getTrustTier(10)).toBe("T0");
-    expect(getTrustTier(25)).toBe("T1");
-    expect(getTrustTier(45)).toBe("T2");
-    expect(getTrustTier(65)).toBe("T3");
-    expect(getTrustTier(95)).toBe("T4");
+  it("assigns the correct tier bucket from raw Ethos score", () => {
+    expect(getTrustTier(100)).toBe("T0");
+    expect(getTrustTier(700)).toBe("T1");
+    expect(getTrustTier(1300)).toBe("T2");
+    expect(getTrustTier(1800)).toBe("T3");
+    expect(getTrustTier(2400)).toBe("T4");
   });
 
-  it("returns deterministic mention weights", () => {
+  it("keeps mention weights uniform across tiers", () => {
     expect(getTierWeight("T0")).toBe(1);
-    expect(getTierWeight("T1")).toBe(2);
-    expect(getTierWeight("T2")).toBe(4);
-    expect(getTierWeight("T3")).toBe(7);
-    expect(getTierWeight("T4")).toBe(10);
+    expect(getTierWeight("T1")).toBe(1);
+    expect(getTierWeight("T2")).toBe(1);
+    expect(getTierWeight("T3")).toBe(1);
+    expect(getTierWeight("T4")).toBe(1);
   });
 
   it("maps buckets to LoL-style labels", () => {
@@ -54,6 +54,6 @@ describe("tier analytics", () => {
     });
 
     expect(high).toBeGreaterThan(low);
-    expect(getTrustTier(high)).toBe("T4");
+    expect(getTrustTier(2400)).toBe("T4");
   });
 });

@@ -60,7 +60,7 @@ export function buildEthosUserSnapshot(rawUser: any, level?: string): EthosUserS
     xpStreakDays: Number(rawUser?.xpStreakDays ?? 0),
     stats,
     trustComposite,
-    trustTier: getTrustTier(trustComposite)
+    trustTier: getTrustTier(score)
   };
 }
 
