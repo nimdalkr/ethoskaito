@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getOfficialProjectUsernameSet, isOfficialProjectUsername, normalizeXUsername } from "@/lib/collector/project-accounts";
-import { buildEthosUserSnapshot, buildEthosUserWriteData, buildTrackedAccountWriteData } from "@/lib/data/users";
+import { buildEthosUserSnapshot, buildEthosUserWriteData, buildTrackedAccountWriteData, upsertEthosUser } from "@/lib/data/users";
 import { ethosClient } from "@/lib/providers/ethos";
 import type { EthosUserSnapshot } from "@/lib/types/domain";
 
@@ -65,20 +65,48 @@ export async function syncEthosUserPool(options: {
 
     const snapshots = page.users.map((user) => buildEthosUserSnapshot(user, user.level ?? undefined));
     const rawUserByUserkey = new Map(page.users.map((user) => [user.userkey, user] as const));
+    const snapshotProfileIds = snapshots
+      .map((snapshot) => snapshot.profileId)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
     const existingUsers = await prisma.ethosUser.findMany({
       where: {
-        userkey: {
-          in: snapshots.map((snapshot) => snapshot.userkey)
-        }
+        OR: [
+          {
+            userkey: {
+              in: snapshots.map((snapshot) => snapshot.userkey)
+            }
+          },
+          snapshotProfileIds.length > 0
+            ? {
+                profileId: {
+                  in: snapshotProfileIds
+                }
+              }
+            : {
+                userkey: {
+                  in: []
+                }
+              }
+        ]
       },
       select: {
-        userkey: true
+        userkey: true,
+        profileId: true
       }
     });
     const existingUserSet = new Set(existingUsers.map((user) => user.userkey));
-    const newUsers = snapshots.filter((snapshot) => !existingUserSet.has(snapshot.userkey));
-    const existingSnapshots = snapshots.filter((snapshot) => existingUserSet.has(snapshot.userkey));
+    const existingProfileIdSet = new Set(
+      existingUsers
+        .map((user) => user.profileId)
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+    );
+    const newUsers = snapshots.filter(
+      (snapshot) => !existingUserSet.has(snapshot.userkey) && (snapshot.profileId === null || !existingProfileIdSet.has(snapshot.profileId))
+    );
+    const existingSnapshots = snapshots.filter(
+      (snapshot) => existingUserSet.has(snapshot.userkey) || (snapshot.profileId !== null && existingProfileIdSet.has(snapshot.profileId))
+    );
 
     if (newUsers.length > 0) {
       await prisma.ethosUser.createMany({
@@ -93,10 +121,7 @@ export async function syncEthosUserPool(options: {
 
     if (refreshExisting) {
       for (const snapshot of existingSnapshots) {
-        await prisma.ethosUser.update({
-          where: { userkey: snapshot.userkey },
-          data: buildEthosUserWriteData(snapshot, rawUserByUserkey.get(snapshot.userkey) ?? null)
-        });
+        await upsertEthosUser(snapshot, rawUserByUserkey.get(snapshot.userkey) ?? null);
         updatedUsers += 1;
       }
     }
