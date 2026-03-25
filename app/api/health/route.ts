@@ -2,6 +2,8 @@ import { getCollectorHealthSnapshot } from "@/lib/collector/health";
 import { isDatabaseConfigured, isDatabaseUnavailable } from "@/lib/db";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const databaseConfigured = isDatabaseConfigured();
 
