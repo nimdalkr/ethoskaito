@@ -1,4 +1,4 @@
-export type TrustTier = "T0" | "T1" | "T2" | "T3" | "T4";
+export type TrustTier = "T0" | "T1" | "T2" | "T3" | "T4" | "T5";
 
 export type EthosLevel =
   | "untrusted"

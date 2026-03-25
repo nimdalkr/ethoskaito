@@ -267,11 +267,12 @@ function deriveEthosLevel(score: number) {
   return "untrusted";
 }
 
-function deriveTrustTier(score: number): "T0" | "T1" | "T2" | "T3" | "T4" {
-  if (score >= 2240) return "T4";
-  if (score >= 1680) return "T3";
-  if (score >= 1120) return "T2";
-  if (score >= 560) return "T1";
+function deriveTrustTier(score: number): "T0" | "T1" | "T2" | "T3" | "T4" | "T5" {
+  if (score >= 1782) return "T5";
+  if (score >= 1514) return "T4";
+  if (score >= 1361) return "T3";
+  if (score >= 1280) return "T2";
+  if (score >= 1238) return "T1";
   return "T0";
 }
 

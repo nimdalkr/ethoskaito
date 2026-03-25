@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
 
 type MindshareWindow = "1d" | "7d" | "30d" | "90d";
-type MindshareTierFilter = "all" | "high" | "mid" | "t1" | "t0";
+type MindshareTierFilter = "all" | "elite" | "high" | "mid" | "t1" | "t0";
 type WindowDays = 1 | 7 | 30 | 90;
 
 type WindowMetrics = {
@@ -61,7 +61,8 @@ const WINDOW_OPTIONS: Array<{ key: MindshareWindow; label: string; days: WindowD
 
 const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: TrustTier[] | null }> = [
   { key: "all", label: "All tiers", tiers: null },
-  { key: "high", label: "Challenger + Diamond", tiers: ["T4", "T3"] },
+  { key: "elite", label: "Challenger + GM", tiers: ["T5", "T4"] },
+  { key: "high", label: "Diamond", tiers: ["T3"] },
   { key: "mid", label: "Platinum", tiers: ["T2"] },
   { key: "t1", label: "Gold", tiers: ["T1"] },
   { key: "t0", label: "Bronze", tiers: ["T0"] }
@@ -1510,7 +1511,7 @@ export function ProjectMindshareBoard({
           if (new Date(mention.mentionedAt).getTime() >= now - selectedWindow.days * 24 * 60 * 60 * 1000) {
             authors.add(mention.authorUserkey);
             mentionCount += 1;
-            if (mention.authorTier === "T4" || mention.authorTier === "T3") {
+            if (mention.authorTier === "T5" || mention.authorTier === "T4" || mention.authorTier === "T3") {
               highTierWeight += mention.weight;
             }
           }

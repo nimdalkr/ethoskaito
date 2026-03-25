@@ -12,34 +12,40 @@ export const dynamic = "force-dynamic";
 
 const tierGuide = [
   {
-    tier: "T4",
+    tier: "T5",
     label: "Challenger",
-    range: "2240-2800",
-    description: "Top Ethos score band. Use this filter when you want the highest-score cohort only."
+    range: "1782+",
+    description: "Top 1% score cohort. This is the narrowest, highest-score slice of Ethos."
+  },
+  {
+    tier: "T4",
+    label: "Grandmaster",
+    range: "1514-1781",
+    description: "Top 5% cohort excluding the Challenger tail."
   },
   {
     tier: "T3",
     label: "Diamond",
-    range: "1680-2239",
-    description: "Upper-middle Ethos score band with strong signal density."
+    range: "1361-1513",
+    description: "Upper cohort covering the 80th to 95th percentile."
   },
   {
     tier: "T2",
     label: "Platinum",
-    range: "1120-1679",
-    description: "Middle cohort. Useful when comparing broad adoption versus early high-score attention."
+    range: "1280-1360",
+    description: "60th to 80th percentile. Useful for comparing solid mid-high signal."
   },
   {
     tier: "T1",
     label: "Gold",
-    range: "560-1119",
-    description: "Lower Ethos score band that helps reveal wider spread once a project starts diffusing."
+    range: "1238-1279",
+    description: "40th to 60th percentile. A narrow middle band around the score median."
   },
   {
     tier: "T0",
     label: "Bronze",
-    range: "0-559",
-    description: "Base cohort. Useful for seeing whether mindshare has reached the widest layer."
+    range: "<1238",
+    description: "Bottom 40% of the score distribution. Useful for seeing the broadest spread."
   }
 ] as const;
 
@@ -102,7 +108,7 @@ export default async function Page() {
               <div className="hero-action-row">
                 <Button className="hero-primary-button">Open Live Dashboard</Button>
                 <Button variant="secondary" className="hero-secondary-button">
-                  {getTrustTierLabel("T4")} monitors active
+                  {getTrustTierLabel("T5")} monitors active
                 </Button>
               </div>
             </div>
@@ -195,8 +201,9 @@ export default async function Page() {
               ))}
             </div>
             <p className="muted-copy compact-copy">
-              Tier cutoffs use the Ethos score scale directly: T0 under 560, T1 from 560, T2 from 1120, T3 from 1680, and T4 from 2240 upward. To compare
-              cohorts, switch the tier filter in the mindshare board instead of adding extra weight to top tiers.
+              Tier cutoffs now follow the current Ethos score distribution: T0 below the 40th percentile, T1 from the 40th to 60th, T2 from the 60th to
+              80th, T3 from the 80th to 95th, T4 for the top 5%, and T5 for the top 1%. To compare cohorts, switch the tier filter in the mindshare board
+              instead of adding extra weight to top tiers.
             </p>
           </CardContent>
         </Card>

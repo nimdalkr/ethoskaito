@@ -220,7 +220,7 @@ async function getCollectionCandidates(input: {
   if (input.mode === "hot") {
     where.ethosUser = {
       trustTier: {
-        in: ["T4", "T3", "T2"]
+        in: ["T5", "T4", "T3", "T2"]
       }
     };
   }

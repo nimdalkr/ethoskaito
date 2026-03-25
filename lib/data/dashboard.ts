@@ -58,7 +58,7 @@ export async function listProjectDashboardData(params: {
       const firstMentionAt = project.mentions[0]?.mentionedAt ?? null;
       const outcome = project.outcomes[0] ?? null;
 
-      const tierBreakdown = ["T0", "T1", "T2", "T3", "T4"].map((tier) => {
+      const tierBreakdown = ["T0", "T1", "T2", "T3", "T4", "T5"].map((tier) => {
         const tierMentions = project.mentions.filter((mention: any) => mention.authorTier === tier);
         return {
           tier,
@@ -166,7 +166,7 @@ export async function getProjectFlow(projectId: string) {
     }
   }
 
-  const tierOrder: TrustTier[] = ["T4", "T3", "T2", "T1", "T0"];
+  const tierOrder: TrustTier[] = ["T5", "T4", "T3", "T2", "T1", "T0"];
   const edges = [];
 
   for (let i = 0; i < tierOrder.length; i += 1) {

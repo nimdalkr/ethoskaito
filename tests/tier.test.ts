@@ -4,10 +4,11 @@ import { computeTrustComposite, getTierWeight, getTrustTier, getTrustTierLabel }
 describe("tier analytics", () => {
   it("assigns the correct tier bucket from raw Ethos score", () => {
     expect(getTrustTier(100)).toBe("T0");
-    expect(getTrustTier(700)).toBe("T1");
-    expect(getTrustTier(1300)).toBe("T2");
-    expect(getTrustTier(1800)).toBe("T3");
-    expect(getTrustTier(2400)).toBe("T4");
+    expect(getTrustTier(1240)).toBe("T1");
+    expect(getTrustTier(1290)).toBe("T2");
+    expect(getTrustTier(1400)).toBe("T3");
+    expect(getTrustTier(1600)).toBe("T4");
+    expect(getTrustTier(1900)).toBe("T5");
   });
 
   it("keeps mention weights uniform across tiers", () => {
@@ -16,6 +17,7 @@ describe("tier analytics", () => {
     expect(getTierWeight("T2")).toBe(1);
     expect(getTierWeight("T3")).toBe(1);
     expect(getTierWeight("T4")).toBe(1);
+    expect(getTierWeight("T5")).toBe(1);
   });
 
   it("maps buckets to LoL-style labels", () => {
@@ -23,7 +25,8 @@ describe("tier analytics", () => {
     expect(getTrustTierLabel("T1")).toBe("Gold");
     expect(getTrustTierLabel("T2")).toBe("Platinum");
     expect(getTrustTierLabel("T3")).toBe("Diamond");
-    expect(getTrustTierLabel("T4")).toBe("Challenger");
+    expect(getTrustTierLabel("T4")).toBe("Grandmaster");
+    expect(getTrustTierLabel("T5")).toBe("Challenger");
   });
 
   it("computes a higher composite for stronger profiles", () => {
@@ -54,6 +57,6 @@ describe("tier analytics", () => {
     });
 
     expect(high).toBeGreaterThan(low);
-    expect(getTrustTier(2400)).toBe("T4");
+    expect(getTrustTier(1900)).toBe("T5");
   });
 });

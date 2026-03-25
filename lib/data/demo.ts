@@ -88,7 +88,7 @@ export const demoUsers: EthosUserSnapshot[] = [
       }
     },
     trustComposite: 96,
-    trustTier: "T4"
+    trustTier: "T5"
   },
   {
     userId: "u2",
@@ -145,10 +145,10 @@ export const demoUsers: EthosUserSnapshot[] = [
 ];
 
 export const demoMentions: ProjectMention[] = [
-  { tweetId: "t1", projectId: "project-1", authorUserkey: "0x1", authorTier: "T4", authorComposite: 96, mentionedAt: "2026-03-18T09:10:00.000Z", weight: 10, isFirstTrackedMention: true },
-  { tweetId: "t2", projectId: "project-1", authorUserkey: "0x2", authorTier: "T4", authorComposite: 84, mentionedAt: "2026-03-18T14:05:00.000Z", weight: 10, isFirstTrackedMention: false },
-  { tweetId: "t3", projectId: "project-2", authorUserkey: "0x3", authorTier: "T3", authorComposite: 67, mentionedAt: "2026-03-19T11:40:00.000Z", weight: 7, isFirstTrackedMention: true },
-  { tweetId: "t4", projectId: "project-3", authorUserkey: "0x2", authorTier: "T4", authorComposite: 84, mentionedAt: "2026-03-20T07:20:00.000Z", weight: 10, isFirstTrackedMention: true }
+  { tweetId: "t1", projectId: "project-1", authorUserkey: "0x1", authorTier: "T5", authorComposite: 96, mentionedAt: "2026-03-18T09:10:00.000Z", weight: 1, isFirstTrackedMention: true },
+  { tweetId: "t2", projectId: "project-1", authorUserkey: "0x2", authorTier: "T4", authorComposite: 84, mentionedAt: "2026-03-18T14:05:00.000Z", weight: 1, isFirstTrackedMention: false },
+  { tweetId: "t3", projectId: "project-2", authorUserkey: "0x3", authorTier: "T3", authorComposite: 67, mentionedAt: "2026-03-19T11:40:00.000Z", weight: 1, isFirstTrackedMention: true },
+  { tweetId: "t4", projectId: "project-3", authorUserkey: "0x2", authorTier: "T4", authorComposite: 84, mentionedAt: "2026-03-20T07:20:00.000Z", weight: 1, isFirstTrackedMention: true }
 ];
 
 export const demoOutcomes: ProjectOutcome[] = [
@@ -158,10 +158,10 @@ export const demoOutcomes: ProjectOutcome[] = [
 ];
 
 export const demoTierRollups: TierRollup[] = [
-  { projectId: "project-1", tier: "T4", mentionCount: 12, weightedMentions: 120, uniqueAuthors: 5, firstMentionAt: "2026-03-18T09:10:00.000Z" },
-  { projectId: "project-1", tier: "T3", mentionCount: 7, weightedMentions: 49, uniqueAuthors: 4, firstMentionAt: "2026-03-18T21:00:00.000Z" },
-  { projectId: "project-2", tier: "T4", mentionCount: 8, weightedMentions: 80, uniqueAuthors: 3, firstMentionAt: "2026-03-19T11:40:00.000Z" },
-  { projectId: "project-3", tier: "T3", mentionCount: 9, weightedMentions: 63, uniqueAuthors: 4, firstMentionAt: "2026-03-20T07:20:00.000Z" }
+  { projectId: "project-1", tier: "T5", mentionCount: 12, weightedMentions: 12, uniqueAuthors: 5, firstMentionAt: "2026-03-18T09:10:00.000Z" },
+  { projectId: "project-1", tier: "T4", mentionCount: 7, weightedMentions: 7, uniqueAuthors: 4, firstMentionAt: "2026-03-18T21:00:00.000Z" },
+  { projectId: "project-2", tier: "T3", mentionCount: 8, weightedMentions: 8, uniqueAuthors: 3, firstMentionAt: "2026-03-19T11:40:00.000Z" },
+  { projectId: "project-3", tier: "T4", mentionCount: 9, weightedMentions: 9, uniqueAuthors: 4, firstMentionAt: "2026-03-20T07:20:00.000Z" }
 ];
 
 export function getDemoHomePageModel() {
@@ -225,7 +225,7 @@ export function getDemoProjectDetail(projectId: string) {
 export function getDemoProjectFlow(projectId: string) {
   const mentions = demoMentions.filter((item) => item.projectId === projectId);
   const firstByTier = Object.fromEntries(
-    ["T4", "T3", "T2", "T1", "T0"]
+    ["T5", "T4", "T3", "T2", "T1", "T0"]
       .map((tier) => [tier, mentions.find((item) => item.authorTier === tier)?.mentionedAt])
       .filter((entry) => entry[1])
   );
@@ -237,12 +237,12 @@ export function getDemoProjectFlow(projectId: string) {
     delayHours: number;
   }> = [];
 
-  if (firstByTier.T4 && firstByTier.T3) {
+  if (firstByTier.T5 && firstByTier.T4) {
     edges.push({
-      source: "T4",
-      target: "T3",
-      startedAt: String(firstByTier.T4),
-      reachedAt: String(firstByTier.T3),
+      source: "T5",
+      target: "T4",
+      startedAt: String(firstByTier.T5),
+      reachedAt: String(firstByTier.T4),
       delayHours: 11.9
     });
   }
