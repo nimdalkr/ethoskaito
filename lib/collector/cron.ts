@@ -6,6 +6,7 @@ import { isDatabaseConfigured, prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { collectProjectActivities } from "@/lib/ingest/project-activities";
 import { collectTrackedTweets } from "@/lib/ingest/collect-tracked-tweets";
+import { syncCollectorUserPoolSlot } from "@/lib/collector/user-pool-sync";
 
 function parsePositiveInt(value: string | null, fallback: number) {
   if (!value) {
@@ -114,6 +115,18 @@ async function maybeCollectProjectActivities(input: {
   });
 }
 
+async function maybeSyncUserPool(input: {
+  isVercelCron: boolean;
+  mode: CollectorMode;
+  rawTarget: string | null;
+}) {
+  if (!input.isVercelCron) {
+    return null;
+  }
+
+  return syncCollectorUserPoolSlot(input.mode, input.rawTarget);
+}
+
 export async function handleCollectorRequest(
   request: NextRequest,
   options: {
@@ -132,8 +145,9 @@ export async function handleCollectorRequest(
 
   const url = new URL(request.url);
   const mode = normalizeMode(options.mode ?? url.searchParams.get("mode"));
+  const rawTarget = options.shard ?? url.searchParams.get("shard");
   const defaults = getDefaultBatchConfig(mode);
-  const shardId = parseOptionalShard(options.shard ?? url.searchParams.get("shard"));
+  const shardId = parseOptionalShard(rawTarget);
   const shardCount = parsePositiveInt(url.searchParams.get("shards"), DEFAULT_COLLECTOR_SHARDS);
   const accountLimit = parsePositiveInt(url.searchParams.get("accounts"), defaults.accountLimit);
   const tweetsPerAccount = parsePositiveInt(url.searchParams.get("tweets"), defaults.tweetsPerAccount);
@@ -141,6 +155,11 @@ export async function handleCollectorRequest(
   const userAgent = request.headers.get("user-agent") ?? "";
   const isVercelCron = userAgent.includes("vercel-cron/1.0");
   if (await shouldSkipVercelCronRequest(isVercelCron)) {
+    const userPoolSync = await maybeSyncUserPool({
+      isVercelCron,
+      mode,
+      rawTarget
+    });
     const projectActivities = await maybeCollectProjectActivities({
       isVercelCron,
       mode,
@@ -150,6 +169,7 @@ export async function handleCollectorRequest(
     return NextResponse.json({
       skipped: true,
       reason: "collector_primary_worker",
+      ...(userPoolSync ? { userPoolSync } : {}),
       ...(projectActivities ? { projectActivities } : {})
     });
   }
@@ -168,9 +188,15 @@ export async function handleCollectorRequest(
     mode,
     shardId
   });
+  const userPoolSync = await maybeSyncUserPool({
+    isVercelCron,
+    mode,
+    rawTarget
+  });
 
   return NextResponse.json({
     ...result,
+    ...(userPoolSync ? { userPoolSync } : {}),
     ...(projectActivities ? { projectActivities } : {})
   });
 }

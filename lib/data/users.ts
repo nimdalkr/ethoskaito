@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeTrustComposite, fallbackLevelFromScore, getTrustTier } from "@/lib/analytics/tier";
-import { DEFAULT_COLLECTOR_SHARDS, getCollectorShardId, getPriorityScore } from "@/lib/collector/scheduling";
+import { DEFAULT_COLLECTOR_SHARDS, getCollectorShardId, getInitialEligibleAt, getPriorityScore } from "@/lib/collector/scheduling";
 import { pickCanonicalEthosUserkey, toEthosXUsernameUserkey } from "@/lib/ethos/identity";
 import type { EthosStats, EthosUserSnapshot } from "@/lib/types/domain";
 
@@ -145,6 +145,11 @@ export function buildTrackedAccountWriteData(input: {
   lastObservedTweetAt?: Date | string | null;
 }) {
   const normalizedUsername = input.xUsername.trim().replace(/^@+/, "").toLowerCase();
+  const priorityScore = getPriorityScore({
+    trustComposite: input.trustComposite ?? null,
+    lastQueuedCount: input.lastQueuedCount ?? null,
+    lastObservedTweetAt: input.lastObservedTweetAt ?? null
+  });
 
   return {
     xUsername: normalizedUsername,
@@ -152,11 +157,7 @@ export function buildTrackedAccountWriteData(input: {
     source: input.source,
     isActive: true,
     assignedShardId: getCollectorShardId(normalizedUsername, DEFAULT_COLLECTOR_SHARDS),
-    priorityScore: getPriorityScore({
-      trustComposite: input.trustComposite ?? null,
-      lastQueuedCount: input.lastQueuedCount ?? null,
-      lastObservedTweetAt: input.lastObservedTweetAt ?? null
-    }),
-    nextEligibleAt: new Date()
+    priorityScore,
+    nextEligibleAt: getInitialEligibleAt(normalizedUsername, priorityScore)
   };
 }

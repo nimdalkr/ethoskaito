@@ -110,12 +110,13 @@ export async function syncEthosUserPool(options: {
         }
       },
       select: {
-        xUsername: true
+        xUsername: true,
+        isActive: true
       }
     });
-    const existingTrackedSet = new Set(existingTrackedAccounts.map((account) => account.xUsername));
-    const newTrackedAccounts = trackedAccounts.filter((account) => !existingTrackedSet.has(account.xUsername));
-    const existingTracked = trackedAccounts.filter((account) => existingTrackedSet.has(account.xUsername));
+    const existingTrackedMap = new Map(existingTrackedAccounts.map((account) => [account.xUsername, account] as const));
+    const newTrackedAccounts = trackedAccounts.filter((account) => !existingTrackedMap.has(account.xUsername));
+    const existingTracked = trackedAccounts.filter((account) => existingTrackedMap.has(account.xUsername));
 
     if (newTrackedAccounts.length > 0) {
       await prisma.trackedAccount.createMany({
@@ -140,6 +141,7 @@ export async function syncEthosUserPool(options: {
           source: account.source,
           trustComposite: snapshots.find((snapshot) => snapshot.userkey === account.ethosUserkey)?.trustComposite ?? null
         });
+        const existingTrackedAccount = existingTrackedMap.get(account.xUsername);
         await prisma.trackedAccount.update({
           where: { xUsername: account.xUsername },
           data: {
@@ -147,7 +149,12 @@ export async function syncEthosUserPool(options: {
             source: account.source,
             isActive: true,
             assignedShardId: scheduling.assignedShardId,
-            priorityScore: scheduling.priorityScore
+            priorityScore: scheduling.priorityScore,
+            ...(existingTrackedAccount?.isActive === false
+              ? {
+                  nextEligibleAt: scheduling.nextEligibleAt
+                }
+              : {})
           }
         });
         updatedTrackedAccounts += 1;

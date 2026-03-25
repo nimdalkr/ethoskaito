@@ -9,13 +9,19 @@ export function normalizeTrackedUsername(value: string) {
   return value.trim().replace(/^@+/, "").toLowerCase();
 }
 
-export function getCollectorShardId(xUsername: string, shardCount = DEFAULT_COLLECTOR_SHARDS) {
+export function getTrackedUsernameHash(xUsername: string) {
   const normalized = normalizeTrackedUsername(xUsername);
   let hash = 0;
 
   for (let index = 0; index < normalized.length; index += 1) {
     hash = (hash * 31 + normalized.charCodeAt(index)) >>> 0;
   }
+
+  return hash;
+}
+
+export function getCollectorShardId(xUsername: string, shardCount = DEFAULT_COLLECTOR_SHARDS) {
+  const hash = getTrackedUsernameHash(xUsername);
 
   return hash % Math.max(1, shardCount);
 }
@@ -78,6 +84,14 @@ export function getNextEligibleAt(options: {
     : getFailureCooldownMs(options.consecutiveFailures ?? 1, options.failureReason);
 
   return new Date(now.getTime() + offsetMs);
+}
+
+export function getInitialEligibleAt(xUsername: string, priorityScore: number, now = new Date()) {
+  const intervalMs = getSweepIntervalMs("main", priorityScore);
+  const hash = getTrackedUsernameHash(xUsername);
+  const spreadOffsetMs = intervalMs <= 0 ? 0 : hash % intervalMs;
+
+  return new Date(now.getTime() + spreadOffsetMs);
 }
 
 export function getCollectorModeLabel(mode: CollectorMode) {
