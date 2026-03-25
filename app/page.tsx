@@ -190,10 +190,8 @@ export default async function Page() {
                 <Card key={entry.tier} variant="default">
                   <CardContent className="stack-3">
                     <div className="stack-2">
-                      <Badge tone="accent">
-                        {entry.tier} · {entry.label}
-                      </Badge>
-                      <strong>Ethos score {entry.range}</strong>
+                      <Badge tone="accent">{entry.label}</Badge>
+                      <div className="muted-copy compact-copy">Ethos score {entry.range}</div>
                     </div>
                     <p className="muted-copy compact-copy">{entry.description}</p>
                   </CardContent>
