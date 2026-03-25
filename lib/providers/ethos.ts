@@ -3,7 +3,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { pickCanonicalEthosUserkey } from "@/lib/ethos/identity";
 import { clamp, normalizeToken, slugify } from "@/lib/utils";
-import { fetchJson, pickString, pickNumber, isRecord, asRecord, pickFirstRecord } from "@/lib/providers/shared";
+import { fetchJson, pickString, pickNumber, isRecord, asRecord, pickFirstRecord, toIsoString } from "@/lib/providers/shared";
 import type {
   EthosActivityActorSummary,
   EthosActivityFeedResult,
@@ -580,6 +580,19 @@ function pickScalarString(source: Record<string, unknown>, keys: string[]) {
   return "";
 }
 
+function pickIsoTimestamp(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.length > 0) {
+      return toIsoString(value);
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return toIsoString(value);
+    }
+  }
+  return "";
+}
+
 function normalizeActivitySummary(raw: unknown): EthosActivitySummary | null {
   if (!isRecord(raw)) {
     return null;
@@ -685,8 +698,8 @@ export function normalizeProjectActivityRecord(raw: unknown): EthosProjectActivi
   const author = normalizeActivityActor(record.author, record.authorUser);
   const subject = normalizeActivityActor(record.subject, record.subjectUser);
   const type = pickString(record, ["type", "activityType"], "activity");
-  const timestamp = pickString(record, ["timestamp"], "");
-  const createdAt = pickString(data, ["createdAt"], "") || pickString(record, ["createdAt"], "");
+  const timestamp = pickIsoTimestamp(record, ["timestamp"]);
+  const createdAt = pickIsoTimestamp(data, ["createdAt"]) || pickIsoTimestamp(record, ["createdAt"]);
   const comment =
     pickString(translation, ["translatedContent"], "") ||
     pickString(data, ["comment"], "") ||

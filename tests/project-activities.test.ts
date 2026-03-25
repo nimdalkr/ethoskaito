@@ -13,7 +13,7 @@ describe("project activity collection", () => {
   it("normalizes raw project review activities", () => {
     const record = normalizeProjectActivityRecord({
       type: "review",
-      timestamp: "2026-03-24T14:00:00.000Z",
+      timestamp: 1774337075,
       link: "https://app.ethos.network/activity/review/123",
       llmQualityScore: 82,
       isSpam: false,
@@ -64,6 +64,7 @@ describe("project activity collection", () => {
     expect(record).not.toBeNull();
     expect(record?.externalActivityId).toBe("123");
     expect(record?.type).toBe("review");
+    expect(record?.timestamp).toBe("2026-03-24T07:24:35.000Z");
     expect(record?.sentiment).toBe("positive");
     expect(record?.comment).toBe("Monad keeps shipping.");
     expect(record?.description).toBe("High conviction builder momentum.");
