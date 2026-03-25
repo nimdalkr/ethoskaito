@@ -55,9 +55,9 @@ function getDefaultBatchConfig(mode: CollectorMode) {
   }
 
   return {
-    accountLimit: 220,
+    accountLimit: 400,
     tweetsPerAccount: 1,
-    concurrency: 4
+    concurrency: 6
   };
 }
 
