@@ -1,11 +1,9 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { FilterBar } from "@/components/dashboard/filter-bar";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { ProjectMindshareBoard } from "@/components/project/project-mindshare-board";
-import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { getHomePageModel } from "@/lib/data/home";
 
 export const dynamic = "force-dynamic";
@@ -15,37 +13,43 @@ const tierGuide = [
     tier: "T5",
     label: "Challenger",
     range: "1782+",
-    description: "Top 1% score cohort. This is the narrowest, highest-score slice of Ethos."
+    band: "Top 1%",
+    description: "Narrow top-score slice. Use this filter to see where elite conviction concentrates."
   },
   {
     tier: "T4",
     label: "Grandmaster",
-    range: "1514-1781",
-    description: "Top 5% cohort excluding the Challenger tail."
+    range: "1514–1781",
+    band: "Top 5%",
+    description: "High-signal cohort just under Challenger. Often early on breakout narratives."
   },
   {
     tier: "T3",
     label: "Diamond",
-    range: "1361-1513",
-    description: "Upper cohort covering the 80th to 95th percentile."
+    range: "1361–1513",
+    band: "80–95th",
+    description: "Upper cohort. Strong for reading how attention expands past the elite tip."
   },
   {
     tier: "T2",
     label: "Platinum",
-    range: "1280-1360",
-    description: "60th to 80th percentile. Useful for comparing solid mid-high signal."
+    range: "1280–1360",
+    band: "60–80th",
+    description: "Solid mid-high band. Useful for comparing durable mid-tier interest."
   },
   {
     tier: "T1",
     label: "Gold",
-    range: "1238-1279",
-    description: "40th to 60th percentile. A narrow middle band around the score median."
+    range: "1238–1279",
+    band: "40–60th",
+    description: "Median band. Good baseline for how broad the conversation is becoming."
   },
   {
     tier: "T0",
     label: "Bronze",
     range: "<1238",
-    description: "Bottom 40% of the score distribution. Useful for seeing the broadest spread."
+    band: "Bottom 40%",
+    description: "Widest spread. Helps separate niche signal from general noise."
   }
 ] as const;
 
@@ -63,105 +67,93 @@ export default async function Page() {
     }))
     .sort((left, right) => right.mentionCount - left.mentionCount)[0];
   const collector = model.collectorSummary;
+  const liveLabel =
+    collector.coveragePct > 0 ? `${collector.coveragePct}% covered · 24h` : "Collector standby";
 
   return (
-    <DashboardShell
-      header={
-        <section className="hero-surface">
-          <video
-            className="hero-video"
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-            src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260217_030345_246c0224-10a4-422c-b324-070b7c0eceda.mp4"
-          />
-          <div className="hero-overlay" />
-          <div className="hero-gradient" />
-          <div className="hero-content">
-            <div className="hero-nav">
-              <div className="hero-brand-row">
-                <div className="hero-brand">ETHOSALPHA</div>
-                <nav className="hero-nav-links" aria-label="Primary">
-                  <a href="#mindshare-board">Mindshare</a>
-                  <a href="#tier-system">Tier System</a>
-                  <a href="#coverage-panel">Coverage</a>
-                </nav>
-              </div>
-              <Button variant="secondary" className="hero-pill-button">
-                Collector Live
-              </Button>
+    <DashboardShell liveLabel={liveLabel}>
+      <section className="page-hero">
+        <div className="page-hero-copy">
+          <Badge tone="accent" className="page-hero-badge">
+            Ethos × X mindshare
+          </Badge>
+          <h1 className="page-title">
+            See which reputation tier
+            <span className="page-title-accent"> moves first</span>
+          </h1>
+          <p className="page-subtitle">
+            Track project attention across Ethos score cohorts, capture first mentions, and check whether the thesis
+            held up on market outcomes — without inflating top-tier weight.
+          </p>
+          {topProject?.project ? (
+            <div className="page-hero-chip-row">
+              <span className="page-hero-chip">
+                Leading board
+                <strong>{topProject.project.name}</strong>
+              </span>
+              <span className="page-hero-chip">
+                Mentions
+                <strong>{totalMentions.toLocaleString()}</strong>
+              </span>
+              <span className="page-hero-chip">
+                First calls
+                <strong>{firstMentions.length.toLocaleString()}</strong>
+              </span>
             </div>
-
-            <div className="hero-copy-stack">
-              <Badge tone="neutral" className="hero-badge">
-                <span className="hero-badge-dot" />
-                Early access available from <strong>May 1, 2026</strong>
-              </Badge>
-              <h1 className="hero-title hero-title-gradient">Web3 signal at the speed of conviction.</h1>
-              <p className="hero-copy hero-copy-wide">
-                Ethos reputation and project-level flow analytics in one board. See which tier spotted a project first,
-                how attention spread, and whether the thesis actually held up.
-              </p>
-              <div className="hero-action-row">
-                <Button className="hero-primary-button">Open Live Dashboard</Button>
-                <Button variant="secondary" className="hero-secondary-button">
-                  {getTrustTierLabel("T5")} monitors active
-                </Button>
-              </div>
+          ) : null}
+        </div>
+        <div className="page-hero-panel">
+          <div className="page-hero-panel-label">Collector coverage</div>
+          <div className="page-hero-panel-value">{collector.coveragePct}%</div>
+          <div className="page-hero-panel-meta">
+            {collector.coveredLast24h.toLocaleString()} / {collector.totalTrackedAccounts.toLocaleString()} accounts in
+            24h
+          </div>
+          <div className="coverage-meter" aria-hidden="true">
+            <div className="coverage-meter-fill" style={{ width: `${Math.min(100, Math.max(0, collector.coveragePct))}%` }} />
+          </div>
+          <div className="page-hero-panel-grid">
+            <div>
+              <span>Due now</span>
+              <strong>{collector.dueNow.toLocaleString()}</strong>
             </div>
-
-            <div className="hero-strip">
-              <div className="hero-strip-card">
-                <span>Top live project</span>
-                <strong>{topProject?.project.name ?? "No project yet"}</strong>
-              </div>
-              <div className="hero-strip-card">
-                <span>Mentions tracked</span>
-                <strong>{totalMentions}</strong>
-              </div>
-              <div className="hero-strip-card">
-                <span>First mention captures</span>
-                <strong>{firstMentions.length}</strong>
-              </div>
-              <div className="hero-strip-card">
-                <span>Validated outcomes</span>
-                <strong>
-                  {validatedProjects} / {model.outcomes.length}
-                </strong>
-              </div>
-              <div className="hero-strip-card">
-                <span>24h coverage</span>
-                <strong>{collector.coveragePct}%</strong>
-              </div>
+            <div>
+              <span>Failed</span>
+              <strong>{collector.failedAccounts.toLocaleString()}</strong>
+            </div>
+            <div>
+              <span>Validated 7d+</span>
+              <strong>
+                {validatedProjects} / {model.outcomes.length}
+              </strong>
             </div>
           </div>
-        </section>
-      }
-    >
+        </div>
+      </section>
+
       <section id="coverage-panel" className="dashboard-intro stack-4">
-        <FilterBar />
+        <FilterBar windowLabel="Live cohort" coveragePct={collector.coveragePct} />
         <div className="metric-grid">
-          <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" />
-          <MetricCard label="Signal authors" value={model.totalUsers} delta="Ethos profiles synced" />
-          <MetricCard label="Mentions ingested" value={model.mentions.length} delta="Fresh live signals captured" />
+          <MetricCard label="Projects tracked" value={model.projects.length} delta="Ethos listings synced" tone="accent" />
+          <MetricCard label="Signal authors" value={model.totalUsers.toLocaleString()} delta="Ethos profiles synced" />
+          <MetricCard label="Mentions ingested" value={totalMentions.toLocaleString()} delta="Fresh live signals" />
           <MetricCard
             label="24h collector coverage"
             value={`${collector.coveragePct}%`}
             delta={`${collector.coveredLast24h} of ${collector.totalTrackedAccounts} accounts`}
+            tone={collector.coveragePct >= 70 ? "accent" : "warm"}
           />
         </div>
       </section>
 
       <section id="mindshare-board" className="stack-4">
-        <Card variant="surface">
+        <Card variant="surface" className="section-card">
           <CardHeader className="card-header-split">
             <div className="stack-3">
               <CardTitle>Mindshare arena</CardTitle>
               <p className="muted-copy compact-copy">
-                Project attention from the Ethos cohort, split by time window and tier filter so you can compare where conviction starts and where it spreads.
+                Project attention from the Ethos cohort, split by time window and tier filter so you can compare where
+                conviction starts and where it spreads.
               </p>
             </div>
             <Badge tone="accent">Live cohort mindshare</Badge>
@@ -173,35 +165,34 @@ export default async function Page() {
       </section>
 
       <section id="tier-system" className="stack-4">
-        <Card variant="surface">
+        <Card variant="surface" className="section-card">
           <CardHeader className="card-header-split">
             <div className="stack-3">
-              <CardTitle>How The Tier System Works</CardTitle>
+              <CardTitle>How the tier system works</CardTitle>
               <p className="muted-copy compact-copy">
-                Tiers now come directly from raw Ethos score only. Mindshare itself counts every mention equally, and tier filters let you inspect how that
-                same mention flow looks across higher-score and lower-score cohorts.
+                Tiers come from raw Ethos score only. Every mention counts equally; use filters to inspect the same flow
+                across higher-score and lower-score cohorts.
               </p>
             </div>
-            <Badge tone="neutral">Score-based tiering</Badge>
+            <Badge tone="neutral">Score-based · equal weight</Badge>
           </CardHeader>
           <CardContent className="stack-4">
-            <div className="metric-grid">
+            <div className="tier-guide-grid">
               {tierGuide.map((entry) => (
-                <Card key={entry.tier} variant="default">
-                  <CardContent className="stack-3">
-                    <div className="stack-2">
-                      <Badge tone="accent">{entry.label}</Badge>
-                      <div className="muted-copy compact-copy">Ethos score {entry.range}</div>
-                    </div>
-                    <p className="muted-copy compact-copy">{entry.description}</p>
-                  </CardContent>
-                </Card>
+                <article key={entry.tier} className={`tier-guide-card tier-guide-${entry.tier.toLowerCase()}`}>
+                  <div className="tier-guide-top">
+                    <span className="tier-guide-code">{entry.tier}</span>
+                    <span className="tier-guide-band">{entry.band}</span>
+                  </div>
+                  <h3 className="tier-guide-label">{entry.label}</h3>
+                  <div className="tier-guide-range">Score {entry.range}</div>
+                  <p className="tier-guide-copy">{entry.description}</p>
+                </article>
               ))}
             </div>
-            <p className="muted-copy compact-copy">
-              Tier cutoffs now follow the current Ethos score distribution: T0 below the 40th percentile, T1 from the 40th to 60th, T2 from the 60th to
-              80th, T3 from the 80th to 95th, T4 for the top 5%, and T5 for the top 1%. To compare cohorts, switch the tier filter in the mindshare board
-              instead of adding extra weight to top tiers.
+            <p className="muted-copy compact-copy tier-guide-footnote">
+              Cutoffs track the Ethos score distribution: T0 below the 40th percentile through T5 at the top 1%. Compare
+              cohorts with the mindshare tier filter instead of inflating elite mention weight.
             </p>
           </CardContent>
         </Card>

@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ETHOSALPHA",
-  description: "Tiered project intelligence built from Ethos reputation and X signal flow."
+  title: "ETHOSALPHA · Ethos mindshare",
+  description: "Tiered project intelligence from Ethos reputation and X signal flow. Equal-weight mindshare, score-based cohorts."
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="app-body">{children}</body>
     </html>
   );
 }

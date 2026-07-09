@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isWorkerLeaseActive } from "@/lib/collector/health";
 import { DEFAULT_COLLECTOR_SHARDS, type CollectorMode } from "@/lib/collector/scheduling";
 import { isDatabaseConfigured, prisma } from "@/lib/db";
-import { env } from "@/lib/env";
+import { authorizeCronSecret, env } from "@/lib/env";
 import { collectProjectActivities } from "@/lib/ingest/project-activities";
 import { collectTrackedTweets } from "@/lib/ingest/collect-tracked-tweets";
 import { syncCollectorUserPoolSlot } from "@/lib/collector/user-pool-sync";
@@ -134,9 +134,9 @@ export async function handleCollectorRequest(
     shard?: string | null;
   } = {}
 ) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = authorizeCronSecret(request.headers.get("authorization"));
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   if (!isDatabaseConfigured()) {

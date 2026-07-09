@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/lib/env";
+import { authorizeCronSecret } from "@/lib/env";
 import { isDatabaseConfigured, prisma } from "@/lib/db";
 import { syncProjectCatalog } from "@/lib/data/projects";
 import { priceClient } from "@/lib/providers/price";
@@ -24,9 +24,9 @@ function pickReturn(points: Array<{ at: string; price: number }>, days: number) 
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = authorizeCronSecret(request.headers.get("authorization"));
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   if (!isDatabaseConfigured()) {

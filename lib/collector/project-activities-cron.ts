@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { isDatabaseConfigured } from "@/lib/db";
-import { env } from "@/lib/env";
+import { authorizeCronSecret } from "@/lib/env";
 import { collectProjectActivities } from "@/lib/ingest/project-activities";
 
 function parsePositiveInt(value: string | null, fallback: number) {
@@ -13,9 +13,9 @@ function parsePositiveInt(value: string | null, fallback: number) {
 }
 
 export async function handleProjectActivitiesCron(request: NextRequest, bucketIndex = 0, bucketCount = 1) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = authorizeCronSecret(request.headers.get("authorization"));
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   if (!isDatabaseConfigured()) {

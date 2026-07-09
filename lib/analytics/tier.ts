@@ -34,8 +34,15 @@ export function getTrustTierRank(tier: TrustTier | null | undefined) {
   return TRUST_TIER_ORDER.indexOf(tier);
 }
 
-export function getTierWeight(tier: TrustTier) {
-  return 1;
+/**
+ * Product intent (equal weight): mindshare compares cohorts via tier filters,
+ * not by inflating top-tier mentions. Every mention counts as weight 1.
+ * Kept as a named helper so call sites stay explicit and tests lock the policy.
+ */
+export const UNIFORM_MENTION_WEIGHT = 1;
+
+export function getTierWeight(_tier: TrustTier) {
+  return UNIFORM_MENTION_WEIGHT;
 }
 
 function computeReviewHealth(stats: EthosStats) {

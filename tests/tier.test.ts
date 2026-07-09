@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeTrustComposite, getTierWeight, getTrustTier, getTrustTierLabel } from "@/lib/analytics/tier";
+import {
+  computeTrustComposite,
+  getTierWeight,
+  getTrustTier,
+  getTrustTierLabel,
+  UNIFORM_MENTION_WEIGHT
+} from "@/lib/analytics/tier";
 
 describe("tier analytics", () => {
   it("assigns the correct tier bucket from raw Ethos score", () => {
@@ -11,13 +17,14 @@ describe("tier analytics", () => {
     expect(getTrustTier(1900)).toBe("T5");
   });
 
-  it("keeps mention weights uniform across tiers", () => {
-    expect(getTierWeight("T0")).toBe(1);
-    expect(getTierWeight("T1")).toBe(1);
-    expect(getTierWeight("T2")).toBe(1);
-    expect(getTierWeight("T3")).toBe(1);
-    expect(getTierWeight("T4")).toBe(1);
-    expect(getTierWeight("T5")).toBe(1);
+  it("keeps mention weights uniform across tiers (filter cohorts, do not inflate top tiers)", () => {
+    expect(UNIFORM_MENTION_WEIGHT).toBe(1);
+    expect(getTierWeight("T0")).toBe(UNIFORM_MENTION_WEIGHT);
+    expect(getTierWeight("T1")).toBe(UNIFORM_MENTION_WEIGHT);
+    expect(getTierWeight("T2")).toBe(UNIFORM_MENTION_WEIGHT);
+    expect(getTierWeight("T3")).toBe(UNIFORM_MENTION_WEIGHT);
+    expect(getTierWeight("T4")).toBe(UNIFORM_MENTION_WEIGHT);
+    expect(getTierWeight("T5")).toBe(UNIFORM_MENTION_WEIGHT);
   });
 
   it("maps buckets to LoL-style labels", () => {

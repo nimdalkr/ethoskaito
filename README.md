@@ -41,6 +41,7 @@ npm run prisma:generate
 npm run typecheck
 npm test
 npm run test:e2e
+npm run snap:mindshare
 npm run dev
 ```
 
@@ -48,6 +49,28 @@ Install the Playwright browser once on a fresh machine:
 
 ```bash
 npm run test:e2e:install
+```
+
+## Screenshot Review
+
+Use the built-in screenshot commands when iterating on UI:
+
+```bash
+npm run snap:home
+npm run snap:mindshare
+```
+
+Both commands will:
+
+- start a local Next dev server automatically
+- capture desktop, tablet, and mobile screenshots
+- save them into `artifacts/screenshots`
+
+You can also capture a custom page or section:
+
+```bash
+npm run snap -- --path /projects/1 --name project-detail --preset all
+npm run snap -- --path / --selector=#mindshare-board --name mindshare --preset all
 ```
 
 ## Key Routes

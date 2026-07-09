@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTrustTierLabel } from "@/lib/analytics/tier";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SiteHeader } from "@/components/layout/site-header";
 import { getUserDetail } from "@/lib/data/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -13,17 +14,35 @@ export default async function UserPage({ params }: { params: { userkey: string }
     notFound();
   }
 
-  const { user, mentionCount, firstMentionCount, hitRate, projects, categories, recentActivities, xpMultipliers } = payload;
+  const { user, mentionCount, firstMentionCount, hitRate, projects, categories, recentActivities, xpMultipliers } =
+    payload;
 
   return (
     <main className="app-shell">
+      <SiteHeader />
       <div className="shell-inner dashboard-stack">
-        <div className="shell-panel shell-panel-header stack-4">
+        <section className="detail-shell-header">
           <div className="header-row">
-            <div className="hero-block stack-3">
-              <Badge tone="accent">User Detail</Badge>
-              <h1 className="hero-title">{user.displayName}</h1>
-              <p className="hero-copy">{user.description ?? "No user description synced yet."}</p>
+            <div className="hero-block">
+              <Badge tone="accent">Signal author</Badge>
+              <h1 className="detail-title">{user.displayName}</h1>
+              <p className="detail-lead">{user.description ?? "No user description synced yet."}</p>
+              <div className="page-hero-chip-row">
+                {user.username ? (
+                  <span className="page-hero-chip">
+                    Handle
+                    <strong>@{user.username}</strong>
+                  </span>
+                ) : null}
+                <span className="page-hero-chip">
+                  Score
+                  <strong>{user.score}</strong>
+                </span>
+                <span className="page-hero-chip">
+                  Composite
+                  <strong>{user.trustComposite}</strong>
+                </span>
+              </div>
             </div>
             <div className="button-row">
               <Link className="button button-secondary" href="/">
@@ -31,44 +50,43 @@ export default async function UserPage({ params }: { params: { userkey: string }
               </Link>
             </div>
           </div>
-        </div>
+        </section>
+
         <div className="dashboard-grid">
           <section className="metric-grid">
-            <Card variant="surface">
-              <CardHeader>
-                <CardTitle>Trust tier</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <strong>{getTrustTierLabel(user.trustTier as any)}</strong>
+            <Card variant="surface" className="metric-card-shell metric-card-tone-accent">
+              <CardContent className="metric-card">
+                <div className="metric-label">Trust tier</div>
+                <div className="metric-value" style={{ fontSize: "1.6rem" }}>
+                  {getTrustTierLabel(user.trustTier as any)}
+                </div>
+                <div className="metric-delta">{user.trustTier}</div>
               </CardContent>
             </Card>
-            <Card variant="surface">
-              <CardHeader>
-                <CardTitle>Total mentions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <strong>{mentionCount}</strong>
+            <Card variant="surface" className="metric-card-shell">
+              <CardContent className="metric-card">
+                <div className="metric-label">Total mentions</div>
+                <div className="metric-value">{mentionCount}</div>
+                <div className="metric-delta">Projects discussed</div>
               </CardContent>
             </Card>
-            <Card variant="surface">
-              <CardHeader>
-                <CardTitle>First calls</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <strong>{firstMentionCount}</strong>
+            <Card variant="surface" className="metric-card-shell">
+              <CardContent className="metric-card">
+                <div className="metric-label">First calls</div>
+                <div className="metric-value">{firstMentionCount}</div>
+                <div className="metric-delta">First-tracked mentions</div>
               </CardContent>
             </Card>
-            <Card variant="surface">
-              <CardHeader>
-                <CardTitle>Hit rate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <strong>{(hitRate * 100).toFixed(1)}%</strong>
+            <Card variant="surface" className="metric-card-shell metric-card-tone-warm">
+              <CardContent className="metric-card">
+                <div className="metric-label">Hit rate</div>
+                <div className="metric-value">{(hitRate * 100).toFixed(1)}%</div>
+                <div className="metric-delta">First calls / mentions</div>
               </CardContent>
             </Card>
           </section>
 
-          <section>
+          <section className="dual-grid dual-grid-even">
             <Card variant="surface">
               <CardHeader>
                 <CardTitle>Lead projects</CardTitle>
@@ -78,90 +96,31 @@ export default async function UserPage({ params }: { params: { userkey: string }
                   <p className="muted-copy">No first-tracked mentions recorded for this user.</p>
                 ) : (
                   projects.map((project: any) => (
-                    <div key={`${project.projectId}-${project.mentionedAt.toISOString()}`} className="panel-line">
+                    <div key={`${project.projectId}-${project.mentionedAt}`} className="panel-line">
                       <span>{project.projectName}</span>
-                      <strong>{new Date(project.mentionedAt).toLocaleString()}</strong>
+                      <strong>{new Date(project.mentionedAt).toLocaleDateString()}</strong>
                     </div>
                   ))
                 )}
               </CardContent>
             </Card>
-          </section>
-
-          <section>
             <Card variant="surface">
               <CardHeader>
-                <CardTitle>Ethos category ranks</CardTitle>
+                <CardTitle>Ethos profile signals</CardTitle>
               </CardHeader>
               <CardContent className="stack-3">
-                {categories.length === 0 ? (
-                  <p className="muted-copy">No category ranking data available yet.</p>
-                ) : (
-                  categories.slice(0, 6).map((item: any) => (
-                    <div key={`${item.category.id}-${item.rank}`} className="panel-line">
-                      <span>{item.category.name}</span>
-                      <strong>#{item.rank}</strong>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <section>
-            <Card variant="surface">
-              <CardHeader>
-                <CardTitle>Recent Ethos activity</CardTitle>
-              </CardHeader>
-              <CardContent className="stack-3">
-                {recentActivities.length === 0 ? (
-                  <p className="muted-copy">No recent Ethos activity was returned for this profile.</p>
-                ) : (
-                  recentActivities.map((activity: any, index: number) => (
-                    <div key={`${activity.type}-${activity.createdAt ?? index}`} className="stack-1">
-                      <div className="panel-line">
-                        <span>{activity.title}</span>
-                        <strong>{activity.type}</strong>
-                      </div>
-                      <span className="muted-copy">
-                        {activity.createdAt ? new Date(activity.createdAt).toLocaleString() : "Timestamp unavailable"}
-                        {activity.score !== null ? ` · score ${activity.score}` : ""}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </section>
-
-          <section>
-            <Card variant="surface">
-              <CardHeader>
-                <CardTitle>XP multipliers</CardTitle>
-              </CardHeader>
-              <CardContent className="stack-3">
-                {!xpMultipliers ? (
-                  <p className="muted-copy">XP multiplier data is not available for this user yet.</p>
-                ) : (
-                  <>
-                    <div className="panel-line">
-                      <span>Combined multiplier</span>
-                      <strong>{xpMultipliers.combinedMultiplier.toFixed(2)}x</strong>
-                    </div>
-                    <div className="panel-line">
-                      <span>Score multiplier</span>
-                      <strong>{xpMultipliers.scoreMultiplier.value.toFixed(2)}x</strong>
-                    </div>
-                    <div className="panel-line">
-                      <span>Streak multiplier</span>
-                      <strong>{xpMultipliers.streakMultiplier.value.toFixed(2)}x</strong>
-                    </div>
-                    <div className="panel-line">
-                      <span>Validator count</span>
-                      <strong>{xpMultipliers.validatorCount}</strong>
-                    </div>
-                  </>
-                )}
+                <div className="panel-line">
+                  <span>Category ranks</span>
+                  <strong>{Array.isArray(categories) ? categories.length : 0}</strong>
+                </div>
+                <div className="panel-line">
+                  <span>Recent activities</span>
+                  <strong>{Array.isArray(recentActivities) ? recentActivities.length : 0}</strong>
+                </div>
+                <div className="panel-line">
+                  <span>XP multipliers</span>
+                  <strong>{xpMultipliers ? "Loaded" : "—"}</strong>
+                </div>
               </CardContent>
             </Card>
           </section>

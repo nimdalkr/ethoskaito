@@ -9,6 +9,10 @@ generated
 playwright-report
 test-results
 blob-report
+artifacts/screenshots
 
 .vercel
 .env*.local
+
+.env.railway-sync
+.env.railway*

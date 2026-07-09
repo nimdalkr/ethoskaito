@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isDatabaseConfigured } from "@/lib/db";
 import { syncEthosUserPool } from "@/lib/data/user-pool";
-import { env } from "@/lib/env";
+import { authorizeCronSecret } from "@/lib/env";
 
 function parsePositiveInt(value: string | null, fallback: number) {
   if (!value) {
@@ -22,9 +22,9 @@ function parseBoolean(value: string | null, fallback = false) {
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = authorizeCronSecret(request.headers.get("authorization"));
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   if (!isDatabaseConfigured()) {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeTrustComposite, fallbackLevelFromScore, getTrustTier } from "@/lib/analytics/tier";
+import { normalizeXUsername } from "@/lib/collector/project-accounts";
 import { DEFAULT_COLLECTOR_SHARDS, getCollectorShardId, getInitialEligibleAt, getPriorityScore } from "@/lib/collector/scheduling";
 import { pickCanonicalEthosUserkey, toEthosXUsernameUserkey } from "@/lib/ethos/identity";
 import type { EthosStats, EthosUserSnapshot } from "@/lib/types/domain";
@@ -144,7 +145,7 @@ export function buildTrackedAccountWriteData(input: {
   lastQueuedCount?: number | null;
   lastObservedTweetAt?: Date | string | null;
 }) {
-  const normalizedUsername = input.xUsername.trim().replace(/^@+/, "").toLowerCase();
+  const normalizedUsername = normalizeXUsername(input.xUsername);
   const priorityScore = getPriorityScore({
     trustComposite: input.trustComposite ?? null,
     lastQueuedCount: input.lastQueuedCount ?? null,

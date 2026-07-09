@@ -1,4 +1,4 @@
-import { getOfficialProjectUsernameSet, isOfficialProjectUsername } from "@/lib/collector/project-accounts";
+import { getOfficialProjectUsernameSet, isOfficialProjectUsername, normalizeXUsername } from "@/lib/collector/project-accounts";
 import { prisma } from "@/lib/db";
 import { matchProjectsByText } from "@/lib/analytics/project-match";
 import { getTierWeight } from "@/lib/analytics/tier";
@@ -23,70 +23,114 @@ function matchProjectsForTweet(input: {
   xUsername: string;
   aliasCandidates: Array<{ projectId: string; aliases: string[] }>;
 }) {
+  const normalizedUsername = normalizeXUsername(input.xUsername);
   const textMatches = matchProjectsByText(input.text, input.aliasCandidates);
   const handleMatches = input.aliasCandidates
-    .filter((candidate) =>
-      candidate.aliases.some((alias) => alias.trim().toLowerCase() === input.xUsername.trim().toLowerCase())
-    )
+    .filter((candidate) => candidate.aliases.some((alias) => normalizeXUsername(alias) === normalizedUsername))
     .map((candidate) => candidate.projectId);
 
   return [...new Set([...textMatches, ...handleMatches])];
 }
 
-export async function ingestTweetBatch(input: IngestBatchInput) {
-  const projects = await ensureAliasesLoaded();
-  const officialProjectUsernames = await getOfficialProjectUsernameSet();
-  const aliasCandidates = projects.map((project: any) => ({
-    projectId: project.id,
-    aliases: project.aliases.map((alias: any) => alias.alias)
-  }));
-  const ethosUsersByUsername = await ethosClient.getUsersByX(input.tweets.map((item) => item.xUsername));
+/**
+ * Keep exactly one earliest mention as first-tracked per project.
+ * Uses mentionedAt ASC, id ASC as a stable tie-breaker.
+ */
+async function repairFirstTrackedMentions(projectIds: string[]) {
+  const uniqueProjectIds = [...new Set(projectIds.filter(Boolean))];
+  if (uniqueProjectIds.length === 0) {
+    return;
+  }
 
-  const results = [];
-
-  for (const item of input.tweets) {
-    const normalizedTweet = await fxTwitterClient.getTweetByStatus({
-      xUsername: item.xUsername,
-      tweetId: item.tweetId,
-      tweetUrl: item.tweetUrl
+  for (const projectId of uniqueProjectIds) {
+    const earliest = await prisma.projectMention.findFirst({
+      where: { projectId },
+      orderBy: [{ mentionedAt: "asc" }, { id: "asc" }],
+      select: { id: true }
     });
 
-    const rawUser = ethosUsersByUsername.get(item.xUsername.trim().toLowerCase()) ?? (await ethosClient.getUserByX(item.xUsername));
-    const snapshot = buildEthosUserSnapshot(rawUser, rawUser?.level ?? undefined);
-    const userRecord = await upsertEthosUser(snapshot, rawUser);
-    const isOfficialAuthor = isOfficialProjectUsername(item.xUsername, officialProjectUsernames);
+    if (!earliest) {
+      continue;
+    }
 
+    await prisma.$transaction([
+      prisma.projectMention.updateMany({
+        where: {
+          projectId,
+          isFirstTrackedMention: true,
+          NOT: { id: earliest.id }
+        },
+        data: { isFirstTrackedMention: false }
+      }),
+      prisma.projectMention.updateMany({
+        where: {
+          projectId,
+          id: earliest.id,
+          isFirstTrackedMention: false
+        },
+        data: { isFirstTrackedMention: true }
+      })
+    ]);
+  }
+}
+
+async function ingestSingleTweet(
+  item: IngestBatchInput["tweets"][number],
+  aliasCandidates: Array<{ projectId: string; aliases: string[] }>,
+  officialProjectUsernames: Set<string>,
+  ethosUsersByUsername: Map<string, Awaited<ReturnType<typeof ethosClient.getUserByX>>>
+) {
+  const xUsername = normalizeXUsername(item.xUsername);
+
+  const normalizedTweet = await fxTwitterClient.getTweetByStatus({
+    xUsername,
+    tweetId: item.tweetId,
+    tweetUrl: item.tweetUrl
+  });
+  const tweetUsername = normalizeXUsername(normalizedTweet.xUsername || xUsername);
+
+  let rawUser = ethosUsersByUsername.get(xUsername) ?? ethosUsersByUsername.get(tweetUsername) ?? null;
+  if (!rawUser) {
+    try {
+      rawUser = await ethosClient.getUserByX(tweetUsername);
+    } catch {
+      rawUser = null;
+    }
+  }
+
+  if (!rawUser) {
+    throw new Error(`Ethos user not found for @${tweetUsername}`);
+  }
+
+  const snapshot = buildEthosUserSnapshot(rawUser, rawUser?.level ?? undefined);
+  const userRecord = await upsertEthosUser(snapshot, rawUser);
+  const isOfficialAuthor = isOfficialProjectUsername(tweetUsername, officialProjectUsernames);
+  const trackedAccountData = buildTrackedAccountWriteData({
+    xUsername: tweetUsername,
+    ethosUserkey: snapshot.userkey,
+    source: item.source,
+    trustComposite: snapshot.trustComposite,
+    lastObservedTweetAt: normalizedTweet.createdAt
+  });
+
+  const matchedProjectIds = await prisma.$transaction(async (tx) => {
     if (!isOfficialAuthor) {
-      await prisma.trackedAccount.upsert({
-        where: { xUsername: item.xUsername },
+      await tx.trackedAccount.upsert({
+        where: { xUsername: trackedAccountData.xUsername },
         update: {
           ethosUserkey: snapshot.userkey,
           source: item.source,
-          priorityScore: buildTrackedAccountWriteData({
-            xUsername: item.xUsername,
-            ethosUserkey: snapshot.userkey,
-            source: item.source,
-            trustComposite: snapshot.trustComposite,
-            lastObservedTweetAt: normalizedTweet.createdAt
-          }).priorityScore
+          priorityScore: trackedAccountData.priorityScore
         },
-        create: {
-          ...buildTrackedAccountWriteData({
-            xUsername: item.xUsername,
-            ethosUserkey: snapshot.userkey,
-            source: item.source,
-            trustComposite: snapshot.trustComposite,
-            lastObservedTweetAt: normalizedTweet.createdAt
-          })
-        }
+        create: trackedAccountData
       });
     }
 
-    const tweetRecord = await prisma.tweet.upsert({
+    const tweetRecord = await tx.tweet.upsert({
       where: { tweetId: normalizedTweet.tweetId },
       update: {
         url: normalizedTweet.url,
-        xUsername: normalizedTweet.xUsername,
+        xUsername: tweetUsername,
         authorName: normalizedTweet.author.name,
         text: normalizedTweet.text,
         createdAt: new Date(normalizedTweet.createdAt),
@@ -102,7 +146,7 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
       create: {
         tweetId: normalizedTweet.tweetId,
         url: normalizedTweet.url,
-        xUsername: normalizedTweet.xUsername,
+        xUsername: tweetUsername,
         authorName: normalizedTweet.author.name,
         text: normalizedTweet.text,
         createdAt: new Date(normalizedTweet.createdAt),
@@ -117,19 +161,18 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
       }
     });
 
-    const matchedProjectIds = matchProjectsForTweet({
+    const projectIds = matchProjectsForTweet({
       text: normalizedTweet.text,
-      xUsername: normalizedTweet.xUsername,
+      xUsername: tweetUsername,
       aliasCandidates
     });
 
-    for (const projectId of matchedProjectIds) {
-      const firstMention = await prisma.projectMention.findFirst({
-        where: { projectId },
-        orderBy: { mentionedAt: "asc" }
-      });
+    const mentionWeight = getTierWeight(snapshot.trustTier);
+    const mentionedAt = new Date(normalizedTweet.createdAt);
 
-      await prisma.projectMention.upsert({
+    for (const projectId of projectIds) {
+      // First-mention flag is repaired after the batch; avoid racey findFirst here.
+      await tx.projectMention.upsert({
         where: {
           tweetId_projectId: {
             tweetId: tweetRecord.id,
@@ -140,9 +183,8 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
           authorUserkey: snapshot.userkey,
           authorTier: snapshot.trustTier,
           authorComposite: snapshot.trustComposite,
-          weight: getTierWeight(snapshot.trustTier),
-          isFirstTrackedMention: !firstMention || firstMention.tweetId === tweetRecord.id,
-          mentionedAt: new Date(normalizedTweet.createdAt)
+          weight: mentionWeight,
+          mentionedAt
         },
         create: {
           tweetId: tweetRecord.id,
@@ -150,23 +192,74 @@ export async function ingestTweetBatch(input: IngestBatchInput) {
           authorUserkey: snapshot.userkey,
           authorTier: snapshot.trustTier,
           authorComposite: snapshot.trustComposite,
-          weight: getTierWeight(snapshot.trustTier),
-          isFirstTrackedMention: !firstMention,
-          mentionedAt: new Date(normalizedTweet.createdAt)
+          weight: mentionWeight,
+          isFirstTrackedMention: false,
+          mentionedAt
         }
       });
     }
 
-    results.push({
-      tweetId: normalizedTweet.tweetId,
-      matchedProjects: matchedProjectIds.length,
-      authorUserkey: snapshot.userkey,
-      trustTier: snapshot.trustTier
-    });
+    return projectIds;
+  });
+
+  return {
+    tweetId: normalizedTweet.tweetId,
+    matchedProjects: matchedProjectIds.length,
+    authorUserkey: snapshot.userkey,
+    trustTier: snapshot.trustTier,
+    projectIds: matchedProjectIds
+  };
+}
+
+export async function ingestTweetBatch(input: IngestBatchInput) {
+  const projects = await ensureAliasesLoaded();
+  const officialProjectUsernames = await getOfficialProjectUsernameSet();
+  const aliasCandidates = projects.map((project) => ({
+    projectId: project.id,
+    aliases: project.aliases.map((alias) => alias.alias)
+  }));
+
+  const normalizedUsernames = input.tweets.map((item) => normalizeXUsername(item.xUsername));
+  const ethosUsersByUsername = await ethosClient.getUsersByX(normalizedUsernames);
+
+  const results: Array<{
+    tweetId: string;
+    matchedProjects: number;
+    authorUserkey: string;
+    trustTier: string;
+  }> = [];
+  const errors: Array<{
+    tweetId: string;
+    xUsername: string;
+    error: string;
+  }> = [];
+  const touchedProjectIds: string[] = [];
+
+  for (const item of input.tweets) {
+    try {
+      const result = await ingestSingleTweet(item, aliasCandidates, officialProjectUsernames, ethosUsersByUsername);
+      results.push({
+        tweetId: result.tweetId,
+        matchedProjects: result.matchedProjects,
+        authorUserkey: result.authorUserkey,
+        trustTier: result.trustTier
+      });
+      touchedProjectIds.push(...result.projectIds);
+    } catch (error) {
+      errors.push({
+        tweetId: item.tweetId,
+        xUsername: normalizeXUsername(item.xUsername),
+        error: error instanceof Error ? error.message : "Unknown ingest error"
+      });
+    }
   }
+
+  await repairFirstTrackedMentions(touchedProjectIds);
 
   return {
     processed: results.length,
-    results
+    failed: errors.length,
+    results,
+    errors
   };
 }

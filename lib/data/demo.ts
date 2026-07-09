@@ -193,6 +193,23 @@ export function getDemoProjectDetail(projectId: string) {
     return null;
   }
 
+  const mentions = demoMentions
+    .filter((mention) => mention.projectId === projectId)
+    .map((mention) => {
+      const user = demoUsers.find((item) => item.userkey === mention.authorUserkey);
+      return {
+        id: `${mention.projectId}-${mention.tweetId}`,
+        ...mention,
+        tweet: {
+          tweetId: mention.tweetId,
+          text: `${project.name} mention by ${user?.displayName ?? mention.authorUserkey}`,
+          url: `https://x.com/${user?.username ?? "demo"}/status/${mention.tweetId}`,
+          xUsername: user?.username ?? "demo",
+          authorName: user?.displayName ?? mention.authorUserkey
+        }
+      };
+    });
+
   return {
     id: project.id,
     projectId: project.projectId,
@@ -203,22 +220,10 @@ export function getDemoProjectDetail(projectId: string) {
     aliases: project.aliases.map((alias) => ({ alias })),
     marketMappings: [{ symbol: project.username ?? project.name.toLowerCase() }],
     outcomes: demoOutcomes.filter((item) => item.projectId === projectId),
-    mentions: demoMentions
-      .filter((mention) => mention.projectId === projectId)
-      .map((mention) => {
-        const user = demoUsers.find((item) => item.userkey === mention.authorUserkey);
-        return {
-          id: `${mention.projectId}-${mention.tweetId}`,
-          ...mention,
-          tweet: {
-            tweetId: mention.tweetId,
-            text: `${project.name} mention by ${user?.displayName ?? mention.authorUserkey}`,
-            url: `https://x.com/${user?.username ?? "demo"}/status/${mention.tweetId}`,
-            xUsername: user?.username ?? "demo",
-            authorName: user?.displayName ?? mention.authorUserkey
-          }
-        };
-      })
+    mentions,
+    mentionTotal: mentions.length,
+    mentionLimit: mentions.length,
+    firstTrackedMentionAt: mentions[0]?.mentionedAt ?? null
   };
 }
 

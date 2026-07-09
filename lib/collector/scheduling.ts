@@ -1,3 +1,5 @@
+import { normalizeXUsername } from "@/lib/collector/project-accounts";
+
 export type CollectorMode = "main" | "repair" | "hot";
 export type CollectorFailureReason = "generic" | "rate_limit";
 
@@ -6,7 +8,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
 export function normalizeTrackedUsername(value: string) {
-  return value.trim().replace(/^@+/, "").toLowerCase();
+  return normalizeXUsername(value);
 }
 
 export function getTrackedUsernameHash(xUsername: string) {
