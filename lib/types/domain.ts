@@ -144,3 +144,14 @@ export interface CollectorOpsSummary {
   latestRepairCompletedAt: string | null;
   latestHotCompletedAt: string | null;
 }
+
+/** Why the mindshare board may look empty even when historical rows exist. */
+export interface DataFreshness {
+  latestMentionAt: string | null;
+  latestTweetObservedAt: string | null;
+  latestCollectorRunAt: string | null;
+  mentionsLast90d: number;
+  mentionsLast180d: number;
+  totalMentions: number;
+  isStale: boolean;
+}

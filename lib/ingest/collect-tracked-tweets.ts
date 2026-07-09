@@ -15,7 +15,7 @@ import {
   getNextEligibleAt,
   getPriorityScore
 } from "@/lib/collector/scheduling";
-import { getUnseenTweetRefs } from "@/lib/collector/fresh-tweets";
+import { getMaxTweetId, getUnseenTweetRefs } from "@/lib/collector/fresh-tweets";
 import { buildTrackedAccountWriteData } from "@/lib/data/users";
 import { ingestTweetBatch } from "@/lib/ingest/ingest-batch";
 import { xGuestClient } from "@/lib/providers/x-guest";
@@ -320,13 +320,16 @@ async function collectSingleAccount(input: {
       lastObservedTweetAt: latestObservedAt
     });
 
+    const highWaterTweetId =
+      getMaxTweetId([...recentTweets.map((tweet) => tweet.tweetId), input.lastSeenTweetId]) ?? null;
+
     await prisma.trackedAccount.update({
       where: { id: input.id },
       data: {
         lastCollectedAt: collectedAt,
         lastSweepAt: collectedAt,
         lastSuccessfulSweepAt: collectedAt,
-        lastSeenTweetId: recentTweets[0]?.tweetId ?? input.lastSeenTweetId ?? null,
+        lastSeenTweetId: highWaterTweetId,
         lastObservedTweetAt: latestObservedAt,
         lastDiscoveredCount: recentTweets.length,
         lastQueuedCount: freshTweets.length,

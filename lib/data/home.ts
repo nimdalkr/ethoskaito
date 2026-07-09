@@ -1,7 +1,23 @@
+import { unstable_cache } from "next/cache";
+
 import { isDatabaseConfigured, isDatabaseUnavailable, prisma } from "@/lib/db";
 import { getDemoHomePageModel } from "@/lib/data/demo";
-import { ensureProjectCatalog } from "@/lib/data/projects";
-import type { CollectorOpsSummary, EthosUserSnapshot, ProjectMention, ProjectOutcome, ProjectSnapshot, TierRollup } from "@/lib/types/domain";
+import type {
+  CollectorOpsSummary,
+  DataFreshness,
+  EthosUserSnapshot,
+  ProjectMention,
+  ProjectOutcome,
+  ProjectSnapshot,
+  TierRollup
+} from "@/lib/types/domain";
+
+const HOME_MENTION_LIMIT = 1500;
+const HOME_PROJECT_LIMIT = 64;
+const HOME_CACHE_SECONDS = 60;
+const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+/** Load enough history for 6M window + previous-period deltas. */
+const MENTION_LOOKBACK_DAYS = 360;
 
 function getEmptyHomePageModel() {
   return {
@@ -22,144 +38,235 @@ function getEmptyHomePageModel() {
       latestMainCompletedAt: null,
       latestRepairCompletedAt: null,
       latestHotCompletedAt: null
-    } satisfies CollectorOpsSummary
+    } satisfies CollectorOpsSummary,
+    freshness: {
+      latestMentionAt: null,
+      latestTweetObservedAt: null,
+      latestCollectorRunAt: null,
+      mentionsLast90d: 0,
+      mentionsLast180d: 0,
+      totalMentions: 0,
+      isStale: true
+    } satisfies DataFreshness
   };
 }
 
-export async function getHomePageModel() {
-  if (!isDatabaseConfigured()) {
-    return getDemoHomePageModel();
-  }
+function logoFromProject(project: {
+  raw: unknown;
+  chains: unknown;
+}) {
+  const raw = project.raw as { user?: { avatarUrl?: string }; bannerImageUrl?: string } | null;
+  const chains = Array.isArray(project.chains) ? (project.chains as Array<{ iconUrl?: string | null }>) : [];
+  return raw?.user?.avatarUrl ?? raw?.bannerImageUrl ?? chains[0]?.iconUrl ?? null;
+}
 
-  try {
-    await ensureProjectCatalog();
+async function loadHomePageModel() {
+  const now = Date.now();
+  const window90 = new Date(now - 90 * 24 * 60 * 60 * 1000);
+  const window180 = new Date(now - 180 * 24 * 60 * 60 * 1000);
+  const window24h = new Date(now - 24 * 60 * 60 * 1000);
+  const mentionLookback = new Date(now - MENTION_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
-    const projects = await prisma.project.findMany({
-      include: { aliases: true },
+  const [
+    projectCount,
+    projects,
+    users,
+    outcomes,
+    mentions,
+    totalUsers,
+    totalTrackedAccounts,
+    coveredLast24h,
+    dueNow,
+    failedAccounts,
+    latestRun,
+    latestMainRun,
+    latestRepairRun,
+    latestHotRun,
+    latestMention,
+    latestTweet,
+    totalMentions,
+    mentionsLast90d,
+    mentionsLast180d
+  ] = await Promise.all([
+    prisma.project.count(),
+    prisma.project.findMany({
+      select: {
+        id: true,
+        projectId: true,
+        userkey: true,
+        name: true,
+        username: true,
+        description: true,
+        categories: true,
+        chains: true,
+        totalVotes: true,
+        uniqueVoters: true,
+        bullishVotes: true,
+        bearishVotes: true,
+        commentCount: true,
+        raw: true,
+        updatedAt: true,
+        aliases: { select: { alias: true } }
+      },
       orderBy: [{ updatedAt: "desc" }]
-    });
-    const users = await prisma.ethosUser.findMany({
+    }),
+    prisma.ethosUser.findMany({
       orderBy: [{ trustComposite: "desc" }, { score: "desc" }],
-      take: 8
-    });
-    const outcomes = await prisma.projectOutcome.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: 20
-    });
-    const mentions = await prisma.projectMention.findMany({
-      include: { tweet: true },
-      orderBy: { mentionedAt: "desc" },
-      take: 1500
-    });
-    const totalUsers = await prisma.ethosUser.count();
-    const totalTrackedAccounts = await prisma.trackedAccount.count({
-      where: {
-        isActive: true
+      take: 8,
+      select: {
+        id: true,
+        userkey: true,
+        profileId: true,
+        displayName: true,
+        username: true,
+        avatarUrl: true,
+        description: true,
+        score: true,
+        level: true,
+        influenceFactor: true,
+        influenceFactorPercentile: true,
+        humanVerificationStatus: true,
+        validatorNftCount: true,
+        xpTotal: true,
+        xpStreakDays: true,
+        reviewNegative: true,
+        reviewNeutral: true,
+        reviewPositive: true,
+        vouchGivenCount: true,
+        vouchReceivedCount: true,
+        trustComposite: true,
+        trustTier: true
       }
-    });
-    const coveredLast24h = await prisma.trackedAccount.count({
+    }),
+    prisma.projectOutcome.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+      select: {
+        projectId: true,
+        symbol: true,
+        source: true,
+        firstPriceAt: true,
+        latestPriceAt: true,
+        return1d: true,
+        return7d: true,
+        return30d: true
+      }
+    }),
+    prisma.projectMention.findMany({
       where: {
-        isActive: true,
-        lastSuccessfulSweepAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        mentionedAt: { gte: mentionLookback }
+      },
+      orderBy: { mentionedAt: "desc" },
+      take: HOME_MENTION_LIMIT,
+      select: {
+        projectId: true,
+        authorUserkey: true,
+        authorTier: true,
+        authorComposite: true,
+        mentionedAt: true,
+        weight: true,
+        isFirstTrackedMention: true,
+        tweet: {
+          select: {
+            tweetId: true
+          }
         }
       }
-    });
-    const dueNow = await prisma.trackedAccount.count({
+    }),
+    prisma.ethosUser.count(),
+    prisma.trackedAccount.count({ where: { isActive: true } }),
+    prisma.trackedAccount.count({
       where: {
         isActive: true,
-        OR: [{ nextEligibleAt: null }, { nextEligibleAt: { lte: new Date() } }]
+        lastSuccessfulSweepAt: { gte: window24h }
       }
-    });
-    const failedAccounts = await prisma.trackedAccount.count({
+    }),
+    prisma.trackedAccount.count({
+      where: {
+        isActive: true,
+        OR: [{ nextEligibleAt: null }, { nextEligibleAt: { lte: new Date(now) } }]
+      }
+    }),
+    prisma.trackedAccount.count({
       where: {
         isActive: true,
         OR: [{ lastCollectorError: { not: null } }, { consecutiveFailures: { gt: 0 } }]
       }
-    });
-    const latestRun = await prisma.collectorRun.findFirst({
-      orderBy: {
-        startedAt: "desc"
-      }
-    });
-    const latestMainRun = await prisma.collectorRun.findFirst({
-      where: {
-        mode: "main",
-        completedAt: {
-          not: null
-        }
-      },
-      orderBy: {
-        completedAt: "desc"
-      }
-    });
-    const latestRepairRun = await prisma.collectorRun.findFirst({
-      where: {
-        mode: "repair",
-        completedAt: {
-          not: null
-        }
-      },
-      orderBy: {
-        completedAt: "desc"
-      }
-    });
-    const latestHotRun = await prisma.collectorRun.findFirst({
-      where: {
-        mode: "hot",
-        completedAt: {
-          not: null
-        }
-      },
-      orderBy: {
-        completedAt: "desc"
-      }
-    });
+    }),
+    prisma.collectorRun.findFirst({ orderBy: { startedAt: "desc" } }),
+    prisma.collectorRun.findFirst({
+      where: { mode: "main", completedAt: { not: null } },
+      orderBy: { completedAt: "desc" },
+      select: { completedAt: true }
+    }),
+    prisma.collectorRun.findFirst({
+      where: { mode: "repair", completedAt: { not: null } },
+      orderBy: { completedAt: "desc" },
+      select: { completedAt: true }
+    }),
+    prisma.collectorRun.findFirst({
+      where: { mode: "hot", completedAt: { not: null } },
+      orderBy: { completedAt: "desc" },
+      select: { completedAt: true }
+    }),
+    prisma.projectMention.findFirst({
+      orderBy: { mentionedAt: "desc" },
+      select: { mentionedAt: true }
+    }),
+    prisma.tweet.findFirst({
+      orderBy: { observedAt: "desc" },
+      select: { observedAt: true }
+    }),
+    prisma.projectMention.count(),
+    prisma.projectMention.count({ where: { mentionedAt: { gte: window90 } } }),
+    prisma.projectMention.count({ where: { mentionedAt: { gte: window180 } } })
+  ]);
+
+  // Catalog sync is owned by cron/refresh — avoid calling Ethos on every homepage hit.
+  // Only surface a hint via empty project count (ops should run /api/cron/refresh).
+  void projectCount;
 
   const mentionWeightByProject = new Map<string, number>();
   for (const mention of mentions) {
-    mentionWeightByProject.set(mention.projectId, (mentionWeightByProject.get(mention.projectId) ?? 0) + mention.weight);
+    mentionWeightByProject.set(
+      mention.projectId,
+      (mentionWeightByProject.get(mention.projectId) ?? 0) + mention.weight
+    );
   }
 
   const projectSnapshots: ProjectSnapshot[] = projects
     .slice()
-    .sort((left: any, right: any) => {
+    .sort((left, right) => {
       const leftWeight = mentionWeightByProject.get(left.id) ?? 0;
       const rightWeight = mentionWeightByProject.get(right.id) ?? 0;
       if (rightWeight !== leftWeight) {
         return rightWeight - leftWeight;
       }
-
       if (right.totalVotes !== left.totalVotes) {
         return right.totalVotes - left.totalVotes;
       }
-
       return right.updatedAt.getTime() - left.updatedAt.getTime();
     })
-    .slice(0, 64)
-    .map((project: any) => ({
-    id: project.id,
-    projectId: project.projectId,
-    userkey: project.userkey,
-    name: project.name,
-    logoUrl:
-      (project.raw as any)?.user?.avatarUrl ??
-      (project.raw as any)?.bannerImageUrl ??
-      project.chains?.[0]?.iconUrl ??
-      null,
-    username: project.username,
-    description: project.description,
-    categories: Array.isArray(project.categories) ? (project.categories as any) : [],
-    chains: Array.isArray(project.chains) ? (project.chains as any) : [],
-    totalVotes: project.totalVotes,
-    uniqueVoters: project.uniqueVoters,
-    bullishVotes: project.bullishVotes,
-    bearishVotes: project.bearishVotes,
-    commentCount: project.commentCount,
-    aliases: project.aliases.map((alias: any) => alias.alias)
-  }));
+    .slice(0, HOME_PROJECT_LIMIT)
+    .map((project) => ({
+      id: project.id,
+      projectId: project.projectId,
+      userkey: project.userkey,
+      name: project.name,
+      logoUrl: logoFromProject(project),
+      username: project.username,
+      description: project.description,
+      categories: Array.isArray(project.categories) ? (project.categories as ProjectSnapshot["categories"]) : [],
+      chains: Array.isArray(project.chains) ? (project.chains as ProjectSnapshot["chains"]) : [],
+      totalVotes: project.totalVotes,
+      uniqueVoters: project.uniqueVoters,
+      bullishVotes: project.bullishVotes,
+      bearishVotes: project.bearishVotes,
+      commentCount: project.commentCount,
+      aliases: project.aliases.map((alias) => alias.alias)
+    }));
 
-  const userSnapshots: EthosUserSnapshot[] = users.map((user: any) => ({
+  const userSnapshots: EthosUserSnapshot[] = users.map((user) => ({
     userId: user.id,
     userkey: user.userkey,
     profileId: user.profileId,
@@ -168,10 +275,10 @@ export async function getHomePageModel() {
     avatarUrl: user.avatarUrl,
     description: user.description,
     score: user.score,
-    level: user.level as any,
+    level: user.level as EthosUserSnapshot["level"],
     influenceFactor: user.influenceFactor,
     influenceFactorPercentile: user.influenceFactorPercentile,
-    humanVerificationStatus: user.humanVerificationStatus as any,
+    humanVerificationStatus: user.humanVerificationStatus as EthosUserSnapshot["humanVerificationStatus"],
     validatorNftCount: user.validatorNftCount,
     xpTotal: user.xpTotal,
     xpStreakDays: user.xpStreakDays,
@@ -195,10 +302,10 @@ export async function getHomePageModel() {
       }
     },
     trustComposite: user.trustComposite,
-    trustTier: user.trustTier as any
+    trustTier: user.trustTier as EthosUserSnapshot["trustTier"]
   }));
 
-  const projectOutcomes: ProjectOutcome[] = outcomes.map((outcome: any) => ({
+  const projectOutcomes: ProjectOutcome[] = outcomes.map((outcome) => ({
     projectId: outcome.projectId,
     symbol: outcome.symbol,
     source: outcome.source,
@@ -209,11 +316,11 @@ export async function getHomePageModel() {
     return30d: outcome.return30d
   }));
 
-  const normalizedMentions: ProjectMention[] = mentions.map((mention: any) => ({
+  const normalizedMentions: ProjectMention[] = mentions.map((mention) => ({
     tweetId: mention.tweet.tweetId,
     projectId: mention.projectId,
     authorUserkey: mention.authorUserkey,
-    authorTier: mention.authorTier as any,
+    authorTier: mention.authorTier as ProjectMention["authorTier"],
     authorComposite: mention.authorComposite,
     mentionedAt: mention.mentionedAt.toISOString(),
     weight: mention.weight,
@@ -250,6 +357,11 @@ export async function getHomePageModel() {
     });
   }
 
+  const latestMentionAt = latestMention?.mentionedAt.toISOString() ?? null;
+  const latestCollectorRunAt = latestRun?.startedAt.toISOString() ?? null;
+  const latestActivityMs = latestMention?.mentionedAt.getTime() ?? latestRun?.startedAt.getTime() ?? 0;
+  const isStale = !latestActivityMs || now - latestActivityMs > STALE_AFTER_MS;
+
   return {
     projects: projectSnapshots,
     users: userSnapshots,
@@ -279,8 +391,42 @@ export async function getHomePageModel() {
       latestMainCompletedAt: latestMainRun?.completedAt?.toISOString() ?? null,
       latestRepairCompletedAt: latestRepairRun?.completedAt?.toISOString() ?? null,
       latestHotCompletedAt: latestHotRun?.completedAt?.toISOString() ?? null
-    }
+    },
+    freshness: {
+      latestMentionAt,
+      latestTweetObservedAt: latestTweet?.observedAt.toISOString() ?? null,
+      latestCollectorRunAt,
+      mentionsLast90d,
+      mentionsLast180d,
+      totalMentions,
+      isStale
+    } satisfies DataFreshness
   };
+}
+
+const getCachedHomePageModel = unstable_cache(loadHomePageModel, ["home-page-model-v2"], {
+  revalidate: HOME_CACHE_SECONDS
+});
+
+export async function getHomePageModel() {
+  if (!isDatabaseConfigured()) {
+    const demo = getDemoHomePageModel();
+    return {
+      ...demo,
+      freshness: {
+        latestMentionAt: demo.mentions[0]?.mentionedAt ?? null,
+        latestTweetObservedAt: null,
+        latestCollectorRunAt: null,
+        mentionsLast90d: demo.mentions.length,
+        mentionsLast180d: demo.mentions.length,
+        totalMentions: demo.mentions.length,
+        isStale: false
+      } satisfies DataFreshness
+    };
+  }
+
+  try {
+    return await getCachedHomePageModel();
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return getEmptyHomePageModel();

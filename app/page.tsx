@@ -69,9 +69,34 @@ export default async function Page() {
   const collector = model.collectorSummary;
   const liveLabel =
     collector.coveragePct > 0 ? `${collector.coveragePct}% covered · 24h` : "Collector standby";
+  const freshness = model.freshness;
 
   return (
     <DashboardShell liveLabel={liveLabel}>
+      {freshness.isStale || freshness.mentionsLast90d === 0 ? (
+        <section className="data-alert" role="status">
+          <div className="data-alert-copy">
+            <strong>Data looks stale or outside short windows</strong>
+            <p>
+              {freshness.totalMentions > 0
+                ? `DB has ${freshness.totalMentions.toLocaleString()} mentions, but only ${freshness.mentionsLast90d.toLocaleString()} in the last 90 days (and ${freshness.mentionsLast180d.toLocaleString()} in 180 days).`
+                : "No mentions are stored yet — the board will stay empty until the collector ingests tweets."}
+              {freshness.latestCollectorRunAt
+                ? ` Last collector run: ${new Date(freshness.latestCollectorRunAt).toLocaleString()}.`
+                : " No collector run recorded."}
+              {freshness.latestMentionAt
+                ? ` Latest mention: ${new Date(freshness.latestMentionAt).toLocaleString()}.`
+                : ""}
+            </p>
+            <p className="data-alert-hint">
+              Fix: run <code>npm run collector:supervisor</code> (or Vercel/Railway cron with a real{" "}
+              <code>CRON_SECRET</code>) and confirm <code>DATABASE_URL</code> points at the same DB as production.
+              The mindshare board defaults to the <strong>6M</strong> window when short windows are empty.
+            </p>
+          </div>
+        </section>
+      ) : null}
+
       <section className="page-hero">
         <div className="page-hero-copy">
           <Badge tone="accent" className="page-hero-badge">
@@ -159,7 +184,7 @@ export default async function Page() {
             <Badge tone="accent">Live cohort mindshare</Badge>
           </CardHeader>
           <CardContent className="stack-3">
-            <ProjectMindshareBoard projects={model.projects} mentions={model.mentions} />
+            <ProjectMindshareBoard projects={model.projects} mentions={model.mentions} freshness={freshness} />
           </CardContent>
         </Card>
       </section>

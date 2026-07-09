@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
+import type { DataFreshness, ProjectMention, ProjectSnapshot, TrustTier } from "@/lib/types/domain";
 
-type MindshareWindow = "1d" | "7d" | "30d" | "90d";
+type MindshareWindow = "1d" | "7d" | "30d" | "90d" | "180d";
 type MindshareTierFilter = "all" | "elite" | "high" | "mid" | "t1" | "t0";
-type WindowDays = 1 | 7 | 30 | 90;
+type WindowDays = 1 | 7 | 30 | 90 | 180;
 
 type WindowMetrics = {
   currentWeight: number;
@@ -56,7 +58,8 @@ const WINDOW_OPTIONS: Array<{ key: MindshareWindow; label: string; days: WindowD
   { key: "1d", label: "24H", days: 1 },
   { key: "7d", label: "7D", days: 7 },
   { key: "30d", label: "30D", days: 30 },
-  { key: "90d", label: "3M", days: 90 }
+  { key: "90d", label: "3M", days: 90 },
+  { key: "180d", label: "6M", days: 180 }
 ];
 
 const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: TrustTier[] | null }> = [
@@ -68,7 +71,7 @@ const TIER_FILTERS: Array<{ key: MindshareTierFilter; label: string; tiers: Trus
   { key: "t0", label: "Bronze", tiers: ["T0"] }
 ];
 
-const WINDOW_DAY_VALUES: WindowDays[] = [1, 7, 30, 90];
+const WINDOW_DAY_VALUES: WindowDays[] = [1, 7, 30, 90, 180];
 const SPARKLINE_BINS = 24;
 const MAX_VISIBLE_ITEMS = 20;
 
@@ -1401,17 +1404,25 @@ function getLayoutValue(entries: RankedEntry[], entry: RankedEntry) {
 
 export function ProjectMindshareBoard({
   projects,
-  mentions
+  mentions,
+  freshness
 }: {
   projects: ProjectSnapshot[];
   mentions: ProjectMention[];
+  freshness?: DataFreshness | null;
 }) {
-  const [windowKey, setWindowKey] = useState<MindshareWindow>("90d");
+  const router = useRouter();
+  const defaultWindow: MindshareWindow = freshness?.isStale || (freshness?.mentionsLast90d ?? 1) === 0 ? "180d" : "90d";
+  const [windowKey, setWindowKey] = useState<MindshareWindow>(defaultWindow);
   const [tierFilter, setTierFilter] = useState<MindshareTierFilter>("all");
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [boardWidth, setBoardWidth] = useState(1000);
   const [hovered, setHovered] = useState<{ entry: RankedEntry; x: number; y: number } | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<RankedEntry | null>(null);
+
+  useEffect(() => {
+    setWindowKey(defaultWindow);
+  }, [defaultWindow]);
 
   useEffect(() => {
     const node = boardRef.current;
@@ -1437,7 +1448,7 @@ export function ProjectMindshareBoard({
 
   const board = useMemo(() => {
     const now = Date.now();
-    const longestWindowMs = 90 * 24 * 60 * 60 * 1000;
+    const longestWindowMs = 180 * 24 * 60 * 60 * 1000;
     const projectMap = new Map(projects.map((project) => [project.id, project]));
     const mentionBuckets = new Map<string, ProjectMention[]>();
     const allowedTiers = selectedTierFilter.tiers ? new Set(selectedTierFilter.tiers) : null;
@@ -1620,6 +1631,13 @@ export function ProjectMindshareBoard({
   );
 
   if (board.ranked.length === 0) {
+    const lastMentionLabel = freshness?.latestMentionAt
+      ? new Date(freshness.latestMentionAt).toLocaleString()
+      : null;
+    const lastRunLabel = freshness?.latestCollectorRunAt
+      ? new Date(freshness.latestCollectorRunAt).toLocaleString()
+      : null;
+
     return (
       <div className="mindshare-stack">
         <div className="mindshare-toolbar">
@@ -1636,9 +1654,26 @@ export function ProjectMindshareBoard({
             ))}
           </div>
         </div>
-        <div className="mindshare-empty">
-          <strong>No live project mindshare yet</strong>
-          <span>Collector coverage is still building. Run more sweeps to populate the arena.</span>
+        <div className="mindshare-empty mindshare-empty-rich">
+          <strong>No mindshare in the {selectedWindow.label} window</strong>
+          {freshness && freshness.totalMentions > 0 ? (
+            <>
+              <span>
+                The database has {freshness.totalMentions.toLocaleString()} historical mentions, but none fall inside this
+                time filter{lastMentionLabel ? ` (latest mention: ${lastMentionLabel})` : ""}.
+              </span>
+              <span>
+                Collector last ran {lastRunLabel ?? "unknown"}. Restart the worker / cron sweeps to refill 24H–3M windows,
+                or switch to <button type="button" className="mindshare-empty-link" onClick={() => setWindowKey("180d")}>6M</button> if
+                older data should still be visible.
+              </span>
+            </>
+          ) : (
+            <span>
+              No project mentions are stored yet. Sync the project catalog, seed tracked accounts, then run{" "}
+              <code>collector:supervisor</code> or <code>POST /api/cron/collect</code>.
+            </span>
+          )}
         </div>
       </div>
     );
@@ -1715,7 +1750,25 @@ export function ProjectMindshareBoard({
                 }}
                 onMouseMove={(event) => setHovered({ entry, x: event.clientX + 14, y: event.clientY + 14 })}
                 onMouseLeave={() => setHovered((current) => (current?.entry.project.id === entry.project.id ? null : current))}
-                onClick={() => setSelectedEntry(entry)}
+                onClick={() => {
+                  if (entry.isOthers || entry.project.id === "others") {
+                    setSelectedEntry(entry);
+                    return;
+                  }
+                  router.push(`/projects/${entry.project.id}`);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    if (entry.isOthers || entry.project.id === "others") {
+                      setSelectedEntry(entry);
+                      return;
+                    }
+                    router.push(`/projects/${entry.project.id}`);
+                  }
+                }}
+                role="link"
+                tabIndex={0}
               >
                 <article
                   className={`mindshare-tile ${tone} ${getTreemapScaleClass(entry.share)} ${getRankTone(entry.rank)}${
@@ -1773,6 +1826,7 @@ export function ProjectMindshareBoard({
           <span>{formatShare(hovered.entry.share)} mindshare</span>
           <span>{formatDelta(hovered.entry.delta24hRelative)} in 24H</span>
           <span>{hovered.entry.mentionCount} mentions</span>
+          {!hovered.entry.isOthers ? <span className="mindshare-tooltip-hint">Click to open project</span> : null}
         </div>
       ) : null}
 
@@ -1813,6 +1867,14 @@ export function ProjectMindshareBoard({
                 <path className="mindshare-sparkline-path" d={buildSparklinePath(selectedEntry.trend)} />
               </svg>
             </div>
+
+            {!selectedEntry.isOthers && selectedEntry.project.id !== "others" ? (
+              <div className="mindshare-modal-actions">
+                <Link className="button button-default" href={`/projects/${selectedEntry.project.id}`}>
+                  Open project detail
+                </Link>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
