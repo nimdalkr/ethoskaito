@@ -126,7 +126,25 @@ function getTweetAuthorUsername(tweet: Record<string, unknown>) {
   const userResults = core && isRecord(core.user_results) ? core.user_results : null;
   const result = userResults && isRecord(userResults.result) ? userResults.result : null;
   const userCore = result && isRecord(result.core) ? result.core : null;
-  return typeof userCore?.screen_name === "string" ? userCore.screen_name : null;
+  if (typeof userCore?.screen_name === "string") {
+    return userCore.screen_name;
+  }
+
+  // Current X GraphQL payloads expose screen_name under user.legacy, not user.core.
+  const userLegacy = result && isRecord(result.legacy) ? result.legacy : null;
+  if (typeof userLegacy?.screen_name === "string") {
+    return userLegacy.screen_name;
+  }
+
+  return null;
+}
+
+function unwrapTweetResult(tweetResult: Record<string, unknown>) {
+  // TweetWithVisibilityResults wraps the real tweet under `.tweet`.
+  if (tweetResult.__typename === "TweetWithVisibilityResults" && isRecord(tweetResult.tweet)) {
+    return tweetResult.tweet;
+  }
+  return tweetResult;
 }
 
 function pushTimelineTweet(
@@ -139,13 +157,14 @@ function pushTimelineTweet(
     return;
   }
 
-  const restId = typeof tweetResult.rest_id === "string" ? tweetResult.rest_id : null;
-  const legacy = isRecord(tweetResult.legacy) ? tweetResult.legacy : null;
+  const unwrapped = unwrapTweetResult(tweetResult);
+  const restId = typeof unwrapped.rest_id === "string" ? unwrapped.rest_id : null;
+  const legacy = isRecord(unwrapped.legacy) ? unwrapped.legacy : null;
   if (!restId || !legacy) {
     return;
   }
 
-  const authorUsername = getTweetAuthorUsername(tweetResult)?.trim().toLowerCase();
+  const authorUsername = getTweetAuthorUsername(unwrapped)?.trim().toLowerCase();
   if (authorUsername !== normalizedUsername || tweets.has(restId)) {
     return;
   }
@@ -154,7 +173,7 @@ function pushTimelineTweet(
     tweetId: restId,
     tweetUrl: `https://x.com/${xUsername}/status/${restId}`,
     xUsername,
-    text: getTextContent(tweetResult),
+    text: getTextContent(unwrapped),
     createdAt: toIsoOrNull(legacy.created_at)
   });
 }
@@ -256,9 +275,43 @@ export function extractTimelineTweetRefs(payload: unknown, xUsername: string): X
   });
 }
 
+/** Known-good GraphQL query IDs when X no longer ships them in a single main bundle. */
+export const FALLBACK_USER_BY_SCREEN_NAME_QUERY_ID = "sLVLhk0bGj3MVFEKTdax1w";
+export const FALLBACK_USER_TWEETS_QUERY_ID = "V1ze5q3ijDS1VeLwLY0m7g";
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
 export function extractMainBundleUrl(html: string) {
-  const match = html.match(/https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[^"]+\.js/);
-  return match?.[0] ?? null;
+  // Legacy responsive-web main chunk
+  const legacy = html.match(/https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[^"'\\\s]+\.js/);
+  if (legacy?.[0]) {
+    return legacy[0];
+  }
+
+  // Current x-web guest-token chunk (contains public bearer)
+  const guestToken = html.match(/https:\/\/abs\.twimg\.com\/x-web\/x-web\/assets\/guest-token-[^"'\\\s]+\.js/);
+  if (guestToken?.[0]) {
+    return guestToken[0];
+  }
+
+  // Current x-web logged-out entry
+  const entry = html.match(/https:\/\/abs\.twimg\.com\/x-web\/x-web\/entry-client-logged-out-[^"'\\\s]+\.js/);
+  return entry?.[0] ?? null;
+}
+
+export function extractConfigScriptUrls(html: string) {
+  const urls = new Set<string>();
+  const main = extractMainBundleUrl(html);
+  if (main) {
+    urls.add(main);
+  }
+
+  for (const match of html.matchAll(/https:\/\/abs\.twimg\.com\/(?:responsive-web\/client-web\/main|x-web\/x-web\/assets\/guest-token|x-web\/x-web\/entry-client-logged-out)[^"'\\\s]+\.js/g)) {
+    urls.add(match[0]);
+  }
+
+  return [...urls];
 }
 
 export function extractPublicBearerToken(bundle: string) {
@@ -268,8 +321,20 @@ export function extractPublicBearerToken(bundle: string) {
 
 export function extractQueryId(bundle: string, operationName: string) {
   const escapedOperation = operationName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = bundle.match(new RegExp(`queryId:"([^"]+)",operationName:"${escapedOperation}"`));
-  return match?.[1] ?? null;
+  const patterns = [
+    new RegExp(`queryId:"([^"]+)",operationName:"${escapedOperation}"`),
+    new RegExp(`operationName:"${escapedOperation}",queryId:"([^"]+)"`),
+    new RegExp(`"${escapedOperation}"\\s*,\\s*queryId:"([^"]+)"`)
+  ];
+
+  for (const pattern of patterns) {
+    const match = bundle.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 async function fetchText(url: string, options: RequestInit & ProviderRequestOptions = {}) {
@@ -286,8 +351,9 @@ async function fetchText(url: string, options: RequestInit & ProviderRequestOpti
       const response = await fetch(url, {
         ...options,
         headers: {
-          "user-agent": "Mozilla/5.0 (compatible; EthosKaitoCollector/1.0)",
+          "user-agent": BROWSER_UA,
           accept: "text/html,application/javascript;q=0.9,*/*;q=0.8",
+          "accept-language": "en-US,en;q=0.9",
           ...options.headers
         },
         signal: options.signal ?? controller.signal
@@ -339,24 +405,39 @@ export class XGuestClient {
       return this.cachedConfig!;
     }
 
-    const profileHtml = await fetchText(`${X_WEB_BASE_URL}/x`, { timeoutMs: 10_000 });
-    const mainBundleUrl = extractMainBundleUrl(profileHtml);
-    if (!mainBundleUrl) {
-      throw new ProviderError("Unable to locate X main bundle", {
+    const profileHtml = await fetchText(`${X_WEB_BASE_URL}/x`, { timeoutMs: 12_000 });
+    const scriptUrls = extractConfigScriptUrls(profileHtml);
+    if (scriptUrls.length === 0) {
+      throw new ProviderError("Unable to locate X config scripts", {
         provider: "x-guest",
         url: `${X_WEB_BASE_URL}/x`
       });
     }
 
-    const bundle = await fetchText(mainBundleUrl, { timeoutMs: 15_000 });
-    const bearerToken = extractPublicBearerToken(bundle);
-    const userByScreenNameQueryId = extractQueryId(bundle, "UserByScreenName");
-    const userTweetsQueryId = extractQueryId(bundle, "UserTweets");
+    let bearerToken: string | null = null;
+    let userByScreenNameQueryId: string | null = null;
+    let userTweetsQueryId: string | null = null;
+    let lastScriptUrl = scriptUrls[0];
 
-    if (!bearerToken || !userByScreenNameQueryId || !userTweetsQueryId) {
+    for (const scriptUrl of scriptUrls) {
+      lastScriptUrl = scriptUrl;
+      const bundle = await fetchText(scriptUrl, { timeoutMs: 15_000 });
+      bearerToken = bearerToken ?? extractPublicBearerToken(bundle);
+      userByScreenNameQueryId = userByScreenNameQueryId ?? extractQueryId(bundle, "UserByScreenName");
+      userTweetsQueryId = userTweetsQueryId ?? extractQueryId(bundle, "UserTweets");
+      if (bearerToken && userByScreenNameQueryId && userTweetsQueryId) {
+        break;
+      }
+    }
+
+    // X's new x-web build often ships bearer without GraphQL query metadata.
+    userByScreenNameQueryId = userByScreenNameQueryId ?? FALLBACK_USER_BY_SCREEN_NAME_QUERY_ID;
+    userTweetsQueryId = userTweetsQueryId ?? FALLBACK_USER_TWEETS_QUERY_ID;
+
+    if (!bearerToken) {
       throw new ProviderError("Unable to extract X guest query config", {
         provider: "x-guest",
-        url: mainBundleUrl
+        url: lastScriptUrl
       });
     }
 
@@ -378,7 +459,7 @@ export class XGuestClient {
         method: "POST",
         headers: {
           authorization: `Bearer ${config.bearerToken}`,
-          "user-agent": "Mozilla/5.0 (compatible; EthosKaitoCollector/1.0)"
+          "user-agent": BROWSER_UA
         }
       },
       (value) => z.object({ guest_token: z.string().min(1) }).parse(value)

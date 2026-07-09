@@ -16,6 +16,14 @@ describe("x guest provider helpers", () => {
     expect(extractMainBundleUrl(html)).toBe("https://abs.twimg.com/responsive-web/client-web/main.64b6b5da.js");
   });
 
+  it("extracts guest-token asset from the modern x-web html", () => {
+    const html = `
+      <script src="https://abs.twimg.com/x-web/x-web/entry-client-logged-out-Dvrf57NQ.js"></script>
+      <link rel="modulepreload" href="https://abs.twimg.com/x-web/x-web/assets/guest-token-Bz9gfV6i.js" />
+    `;
+    expect(extractMainBundleUrl(html)).toBe("https://abs.twimg.com/x-web/x-web/assets/guest-token-Bz9gfV6i.js");
+  });
+
   it("extracts the public bearer token and graphql query ids from the bundle", () => {
     const bundle = `
       e.exports={queryId:"IGgvgiOx4QZndDHuD3x9TQ",operationName:"UserByScreenName"}
@@ -51,7 +59,7 @@ describe("x guest provider helpers", () => {
                                 core: {
                                   user_results: {
                                     result: {
-                                      core: {
+                                      legacy: {
                                         screen_name: "monad"
                                       }
                                     }
