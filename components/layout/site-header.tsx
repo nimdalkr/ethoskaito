@@ -13,13 +13,17 @@ export function SiteHeader({
       <div className="site-header-inner">
         <div className="site-header-left">
           <Link href="/" className="site-brand" aria-label="Ethos Alpha home">
-            <span className="site-brand-mark" aria-hidden="true" />
-            <span className="site-brand-text">ETHOSALPHA</span>
+            <span className="site-brand-mark" aria-hidden="true">
+              <span className="site-brand-mark-core" />
+            </span>
+            <span className="site-brand-text">
+              ETHOS<span className="site-brand-accent">ALPHA</span>
+            </span>
           </Link>
           <nav className="site-nav" aria-label="Primary">
             <a href="/#mindshare-board">Mindshare</a>
-            <a href="/#tier-system">Tiers</a>
             <a href="/#coverage-panel">Coverage</a>
+            <a href="/#tier-system">Tiers</a>
           </nav>
         </div>
         <div className="site-header-right">
